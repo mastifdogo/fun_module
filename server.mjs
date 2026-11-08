@@ -2,8 +2,9 @@
 // only hands her settings to the page, cleaned up so the browser never has to
 // trust stored values.
 
-const HAIR = ["pink", "midnight", "silver", "chestnut", "mint", "honey"];
+const HAIR = ["black", "chestnut", "midnight", "pink", "silver", "honey"];
 const ENERGY = ["calm", "normal", "hyper"];
+const DRESS = ["ankara", "yukata"];
 
 /** @param {unknown} v @param {number} min @param {number} max @param {number} dflt */
 function num(v, min, max, dflt) {
@@ -18,8 +19,9 @@ export function cleanConfig(s) {
 	return {
 		name: name || "Hana",
 		autoSummon: s.auto_summon !== false,
-		hair: HAIR.includes(/** @type {string} */ (s.hair)) ? s.hair : "pink",
-		size: num(s.size, 48, 160, 84),
+		hair: HAIR.includes(/** @type {string} */ (s.hair)) ? s.hair : "black",
+		size: num(s.size, 72, 220, 130),
+		dress: DRESS.includes(/** @type {string} */ (s.dress)) ? s.dress : "ankara",
 		energy: ENERGY.includes(/** @type {string} */ (s.energy)) ? s.energy : "normal",
 		speech: s.speech !== false,
 		sleepAfter: num(s.sleep_after, 15, 3600, 120),

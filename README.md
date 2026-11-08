@@ -1,7 +1,10 @@
 # Desk Buddy
 
-A [Ledger](https://github.com/mastifdogo/Bookeeping) module: a little anime
-girl who keeps you company while you do the books. She lives on top of
+A [Ledger](https://github.com/mastifdogo/Bookeeping) module: a little
+companion who keeps you company while you do the books. She's a young woman
+with dark skin, brown eyes and loose, curly black hair, in a traditional
+dress (a West African wax-print Ankara dress, or a yukata), drawn in SVG with
+realistic proportions, soft shading and jointed limbs. She lives on top of
 Ledger's windows:
 
 - wanders along the bottom of the screen, peeks up from below it and follows
@@ -17,7 +20,8 @@ Ledger's windows:
   and falls asleep when you stop working (any input wakes her up);
 - can be dragged and thrown. Click to poke her, double-click for a heart.
 
-She is drawn in SVG and runs entirely in your browser; nothing is stored.
+She moves smoothly between poses (her curls and skirt trail behind her), and
+runs entirely in your browser; nothing is stored.
 
 ## Use
 
@@ -36,8 +40,9 @@ She is drawn in SVG and runs entirely in your browser; nothing is stored.
 |---|---|---|
 | Her name | Hana | Used in her speech bubbles. |
 | Come out when the page opens | on | Off: she waits for the Summon button. |
-| Hair colour | Sakura pink | Pink, midnight blue, silver, chestnut, mint, honey blonde. |
-| Height | 84 px | 48–160. |
+| Hair colour | Black | Black, dark brown, midnight blue, pink, silver, honey blonde. |
+| Dress | Ankara | Ankara wax-print dress or yukata. |
+| Height | 130 px | 72–220. |
 | Energy | Normal | Calm sits and watches; Hyper climbs everything. |
 | Speech bubbles | on | |
 | Falls asleep after | 120 s | Seconds without mouse or keyboard input. |
@@ -71,4 +76,7 @@ tag and create a GitHub Release from it.
 
 ## Changes
 
+- 0.2.0: new look: realistic proportions, dark skin, brown eyes, loose curly
+  black hair, traditional dress (Ankara or yukata, new Dress setting), soft
+  shading, knees and elbows, smooth pose blending.
 - 0.1.0: first version.

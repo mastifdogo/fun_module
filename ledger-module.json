@@ -1,7 +1,7 @@
 {
   "id": "desk-buddy",
   "name": "Desk Buddy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A little anime girl who climbs your Ledger windows while you work.",
   "ledger": ">=0.9.1",
   "server": "server.mjs",
@@ -14,25 +14,117 @@
   },
   "settings": {
     "fields": [
-      { "key": "buddy_name", "label": "Her name", "type": "text", "default": "Hana", "help": "What she calls herself in speech bubbles." },
-      { "key": "auto_summon", "label": "Come out when the Desk Buddy page opens", "type": "boolean", "default": true, "help": "Off: she waits until you press Summon." },
-      { "key": "hair", "label": "Hair colour", "type": "select", "default": "pink", "options": [
-        { "value": "pink", "label": "Sakura pink" },
-        { "value": "midnight", "label": "Midnight blue" },
-        { "value": "silver", "label": "Silver" },
-        { "value": "chestnut", "label": "Chestnut" },
-        { "value": "mint", "label": "Mint" },
-        { "value": "honey", "label": "Honey blonde" }
-      ] },
-      { "key": "size", "label": "Height (pixels)", "type": "number", "min": 48, "max": 160, "default": 84 },
-      { "key": "energy", "label": "Energy", "type": "select", "default": "normal", "options": [
-        { "value": "calm", "label": "Calm: mostly sits and watches" },
-        { "value": "normal", "label": "Normal" },
-        { "value": "hyper", "label": "Hyper: climbs everything" }
-      ] },
-      { "key": "speech", "label": "Speech bubbles", "type": "boolean", "default": true },
-      { "key": "sleep_after", "label": "Falls asleep after (seconds without input)", "type": "number", "min": 15, "max": 3600, "default": 120 },
-      { "key": "extra_windows", "label": "Extra things she can climb (CSS selectors)", "type": "text", "default": "", "help": "Comma-separated, e.g. table, .toolbar. Panes, cards and dialogs are always climbable." }
+      {
+        "key": "buddy_name",
+        "label": "Her name",
+        "type": "text",
+        "default": "Hana",
+        "help": "What she calls herself in speech bubbles."
+      },
+      {
+        "key": "auto_summon",
+        "label": "Come out when the Desk Buddy page opens",
+        "type": "boolean",
+        "default": true,
+        "help": "Off: she waits until you press Summon."
+      },
+      {
+        "key": "hair",
+        "label": "Hair colour",
+        "type": "select",
+        "default": "black",
+        "options": [
+          {
+            "value": "black",
+            "label": "Black"
+          },
+          {
+            "value": "chestnut",
+            "label": "Dark brown"
+          },
+          {
+            "value": "midnight",
+            "label": "Midnight blue"
+          },
+          {
+            "value": "pink",
+            "label": "Pink"
+          },
+          {
+            "value": "silver",
+            "label": "Silver"
+          },
+          {
+            "value": "honey",
+            "label": "Honey blonde"
+          }
+        ]
+      },
+      {
+        "key": "dress",
+        "label": "Dress",
+        "type": "select",
+        "default": "ankara",
+        "options": [
+          {
+            "value": "ankara",
+            "label": "Ankara wax-print dress"
+          },
+          {
+            "value": "yukata",
+            "label": "Yukata"
+          }
+        ]
+      },
+      {
+        "key": "size",
+        "label": "Height (pixels)",
+        "type": "number",
+        "min": 72,
+        "max": 220,
+        "default": 130
+      },
+      {
+        "key": "energy",
+        "label": "Energy",
+        "type": "select",
+        "default": "normal",
+        "options": [
+          {
+            "value": "calm",
+            "label": "Calm: mostly sits and watches"
+          },
+          {
+            "value": "normal",
+            "label": "Normal"
+          },
+          {
+            "value": "hyper",
+            "label": "Hyper: climbs everything"
+          }
+        ]
+      },
+      {
+        "key": "speech",
+        "label": "Speech bubbles",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "key": "sleep_after",
+        "label": "Falls asleep after (seconds without input)",
+        "type": "number",
+        "min": 15,
+        "max": 3600,
+        "default": 120
+      },
+      {
+        "key": "extra_windows",
+        "label": "Extra things she can climb (CSS selectors)",
+        "type": "text",
+        "default": "",
+        "help": "Comma-separated, e.g. table, .toolbar. Panes, cards and dialogs are always climbable."
+      }
     ]
   }
 }

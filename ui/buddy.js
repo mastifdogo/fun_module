@@ -14,7 +14,7 @@
  */
 (function () {
 	"use strict";
-	const VERSION = "0.1.0";
+	const VERSION = "0.2.0";
 	const NS = "http://www.w3.org/2000/svg";
 	const kit = (window.__deskBuddyKit = window.__deskBuddyKit || {});
 	if (kit.version === VERSION && kit.start) return;
@@ -22,18 +22,28 @@
 
 	// ---------------------------------------------------------------- art --
 
+	// Hair colours; black is the default. Eyes are always a warm brown.
 	const HAIR = {
-		pink: { base: "#f6a5c8", shade: "#d9729f", eye: "#7b4fd8" },
-		midnight: { base: "#343a60", shade: "#1d2140", eye: "#e0506f" },
-		silver: { base: "#e4e7ef", shade: "#aab3c6", eye: "#3f8fd9" },
-		chestnut: { base: "#9a5d3c", shade: "#6b3d24", eye: "#3aa36f" },
-		mint: { base: "#8adfcb", shade: "#4fb29c", eye: "#d9567a" },
-		honey: { base: "#f5cb62", shade: "#cf9c2c", eye: "#4a6fdc" },
+		black: { base: "#1f1c27", shade: "#0b0a10", sheen: "#6470b0" },
+		chestnut: { base: "#583322", shade: "#331c12", sheen: "#a3725a" },
+		midnight: { base: "#262c56", shade: "#121530", sheen: "#7584d6" },
+		pink: { base: "#e07aa8", shade: "#a84a76", sheen: "#ffc8e0" },
+		silver: { base: "#c7ccd8", shade: "#868fa3", sheen: "#ffffff" },
+		honey: { base: "#d4a03f", shade: "#9a6a1e", sheen: "#ffe6a6" },
 	};
-	const INK = "#3b2b33";
-	const SKIN = "#ffe6d8";
-	const NAVY = "#33508f";
-	const RED = "#e2525f";
+	// Traditional dresses: a West African wax-print (Ankara) dress, or a yukata.
+	const DRESS = {
+		ankara: { ground: "#dd6229", motif: "#1d8686", ring: "#f3c443", dot: "#3b2a6e", sash: "#1d8686", sashH: 1.6, hem: 52, flare: 6, sleeve: "puff", shoe: "#5e3420" },
+		yukata: { ground: "#2c3e72", motif: "#f1efe8", ring: "#f2a5b7", dot: "#7f93c9", sash: "#c4403d", sashH: 4, hem: 60, flare: 1.4, sleeve: "wide", shoe: "#b98f66", collar: true },
+	};
+	const LINE = "#3a2119"; // warm, thin line art
+	const SKIN = "#7a4832";
+	const SKIN_SHADE = "#5a321f";
+	const SKIN_LIGHT = "#a26c4d";
+	const EYE = "#5e3318";
+	const EYE_LIGHT = "#9c5f2e";
+	const LIP_TOP = "#6a3330";
+	const LIP_LOW = "#8a4842";
 
 	function node(doc, tag, attrs, parent) {
 		const n = doc.createElementNS(NS, tag);
@@ -42,116 +52,250 @@
 		return n;
 	}
 
-	/** Builds her SVG (viewBox 48x64, feet at the bottom centre) and returns the movable parts. */
-	function createSvg(doc, hairName) {
-		const h = HAIR[hairName] || HAIR.pink;
-		const ln = (a) => Object.assign({ stroke: INK, "stroke-width": 1.1, "stroke-linejoin": "round", "stroke-linecap": "round" }, a);
+	/** An elliptical outline made of little outward bumps: curly hair. */
+	function curly(cx, cy, rx, ry, n, bump) {
+		let d = "";
+		for (let i = 0; i <= n; i++) {
+			const a = (i / n) * Math.PI * 2;
+			const x = (cx + rx * Math.cos(a)).toFixed(2), y = (cy + ry * Math.sin(a)).toFixed(2);
+			d += i === 0 ? `M${x} ${y}` : ` A${bump} ${bump} 0 0 1 ${x} ${y}`;
+		}
+		return d + "Z";
+	}
+
+	/** Little curl strokes scattered over an ellipse (seeded, so she looks the same every time). */
+	function curlTexture(cx, cy, rx, ry, count, seed, size) {
+		let x = seed;
+		const r = () => ((x = (x * 16807) % 2147483647) / 2147483647);
+		let d = "";
+		for (let i = 0; i < count; i++) {
+			const a = r() * Math.PI * 2, k = Math.sqrt(r()) * 0.9;
+			const px = cx + Math.cos(a) * rx * k, py = cy + Math.sin(a) * ry * k, s = size * (0.7 + r() * 0.6);
+			d += `M${(px - s).toFixed(2)} ${py.toFixed(2)} a${s.toFixed(2)} ${s.toFixed(2)} 0 1 1 ${(s * 1.5).toFixed(2)} ${(s * 0.8).toFixed(2)} `;
+		}
+		return d;
+	}
+
+	/**
+	 * Builds her SVG (viewBox 48x64, feet at the bottom centre, about six and a
+	 * half heads tall) and returns the movable parts. Limbs have joints: legs
+	 * bend at the knee, arms at the elbow.
+	 */
+	function createSvg(doc, hairName, dressName) {
+		const h = HAIR[hairName] || HAIR.black;
+		const dr = DRESS[dressName] || DRESS.ankara;
+		const uid = Math.random().toString(36).slice(2, 9);
+		const url = (n) => `url(#ldb-${n}-${uid})`;
+		const ln = (a) => Object.assign({ stroke: LINE, "stroke-width": 0.32, "stroke-linejoin": "round", "stroke-linecap": "round" }, a);
+		const strand = (d, parent, w, color, op) => node(doc, "path", { d, fill: "none", stroke: color || h.base, "stroke-width": w || 0.5, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: op == null ? 1 : op }, parent);
+		const sheen = (d, parent, w) => strand(d, parent, w || 0.35, h.sheen, 0.45);
 		const svg = node(doc, "svg", { viewBox: "0 0 48 64", width: "100%", height: "100%", overflow: "visible", "aria-hidden": "true" });
+
+		// Gradients and the fabric print, with ids unique to this drawing.
+		const defs = node(doc, "defs", {}, svg);
+		const grad = (kind, name, attrs, stops) => {
+			const g = node(doc, kind, Object.assign({ id: `ldb-${name}-${uid}` }, attrs), defs);
+			for (const [o, c, op] of stops) node(doc, "stop", { offset: o, "stop-color": c, "stop-opacity": op == null ? 1 : op }, g);
+		};
+		grad("linearGradient", "skin", { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, SKIN_LIGHT], [0.45, SKIN], [1, SKIN_SHADE]]);
+		grad("radialGradient", "face", { cx: 0.42, cy: 0.4, r: 0.68 }, [[0, SKIN_LIGHT], [0.55, SKIN], [1, SKIN_SHADE]]);
+		grad("linearGradient", "fold", { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, "#ffffff", 0.12], [0.4, "#000000", 0], [1, "#000000", 0.32]]);
+		grad("linearGradient", "drop", { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, "#000000", 0.3], [1, "#000000", 0]]);
+		grad("radialGradient", "hair", { cx: 0.38, cy: 0.3, r: 0.75 }, [[0, h.sheen, 0.5], [0.35, h.base], [1, h.shade]]);
+		grad("radialGradient", "iris", { cx: 0.5, cy: 0.62, r: 0.6 }, [[0, EYE_LIGHT], [0.7, EYE], [1, "#2a160b"]]);
+		const pat = node(doc, "pattern", { id: `ldb-print-${uid}`, width: 4, height: 4, patternUnits: "userSpaceOnUse", patternTransform: "scale(0.68)" }, defs);
+		node(doc, "rect", { width: 4, height: 4, fill: dr.ground }, pat);
+		node(doc, "circle", { cx: 2, cy: 2, r: 1.2, fill: dr.motif, stroke: dr.ring, "stroke-width": 0.42 }, pat);
+		node(doc, "circle", { cx: 2, cy: 2, r: 0.38, fill: dr.ring }, pat);
+		for (const [x, y] of [[0, 0], [4, 0], [0, 4], [4, 4]]) node(doc, "circle", { cx: x, cy: y, r: 0.48, fill: dr.dot }, pat);
+		const print = url("print");
+		const almond = (x) => `M${x - 1.15} 9.1 Q${x - 0.2} 8.15 ${x + 1.15} 8.95 Q${x + 0.1} 9.85 ${x - 1.15} 9.1 Z`;
+		for (const [n, x] of [["eyeL", 22.2], ["eyeR", 25.8]]) node(doc, "path", { d: almond(x) }, node(doc, "clipPath", { id: `ldb-${n}-${uid}` }, defs));
+
 		const rig = node(doc, "g", {}, svg);
 		const p = { svg, rig };
 
-		// Twin tails, behind everything; they swing and fly up when she falls.
+		// Loose curly hair: a big mass behind her shoulders (behind the body).
 		p.tails = node(doc, "g", {}, rig);
-		p.tailL = node(doc, "g", {}, p.tails);
-		node(doc, "path", ln({ d: "M11 13 C3 16 1.5 30 6 41 C8.5 34 12.5 24 13.5 15 Z", fill: h.base }), p.tailL);
-		node(doc, "path", { d: "M9 18 C6 24 5.5 31 6.5 37", fill: "none", stroke: h.shade, "stroke-width": 1 }, p.tailL);
-		p.tailR = node(doc, "g", {}, p.tails);
-		node(doc, "path", ln({ d: "M37 13 C45 16 46.5 30 42 41 C39.5 34 35.5 24 34.5 15 Z", fill: h.base }), p.tailR);
-		node(doc, "path", { d: "M39 18 C42 24 42.5 31 41.5 37", fill: "none", stroke: h.shade, "stroke-width": 1 }, p.tailR);
+		node(doc, "path", ln({ d: curly(24, 11, 9.6, 12.8, 34, 1.4), fill: url("hair") }), p.tails);
+		strand(curlTexture(24, 11, 9.6, 12.8, 46, 7, 0.75), p.tails, 0.32, h.shade, 0.7);
+		strand(curlTexture(24, 10, 9, 12, 30, 19, 0.6), p.tails, 0.28, h.sheen, 0.4);
 
-		// Legs (pivot at the hips).
+		// Legs: thigh pivots at the hip, shin at the knee; bare feet in sandals.
 		const leg = (x) => {
 			const g = node(doc, "g", {}, rig);
-			node(doc, "rect", ln({ x: x - 1.7, y: 49, width: 3.4, height: 9, rx: 1.5, fill: SKIN }), g);
-			node(doc, "rect", ln({ x: x - 1.8, y: 55.5, width: 3.6, height: 5.5, rx: 1.2, fill: "#ffffff" }), g);
-			node(doc, "ellipse", ln({ cx: x + 0.9, cy: 61.8, rx: 3, ry: 1.9, fill: "#6a4232" }), g);
-			return g;
+			node(doc, "path", ln({ d: `M${x - 1.5} 32 Q${x - 1.75} 40 ${x - 1.1} 47.6 L${x + 1.1} 47.6 Q${x + 1.6} 40 ${x + 1.5} 32 Z`, fill: url("skin") }), g);
+			const shin = node(doc, "g", {}, g);
+			node(doc, "path", ln({ d: `M${x - 1.12} 46.8 Q${x - 1.45} 50.5 ${x - 0.95} 54 Q${x - 0.65} 58 ${x - 0.62} 60.6 L${x + 0.62} 60.6 Q${x + 0.75} 57 ${x + 1.2} 52.5 Q${x + 1.45} 49.5 ${x + 1.12} 46.8 Z`, fill: url("skin") }), shin);
+			node(doc, "ellipse", { cx: x + 0.1, cy: 47.6, rx: 0.8, ry: 0.5, fill: SKIN_LIGHT, opacity: 0.45 }, shin);
+			node(doc, "path", ln({ d: `M${x - 0.75} 60.2 L${x + 0.75} 60.2 Q${x + 1.4} 61.6 ${x + 2.7} 62.5 Q${x + 3} 63.3 ${x + 2.2} 63.4 L${x - 0.9} 63.4 Q${x - 1.3} 62.6 ${x - 0.75} 60.2 Z`, fill: url("skin") }), shin);
+			node(doc, "rect", { x: x - 1.2, y: 63.2, width: 4.4, height: 0.55, rx: 0.25, fill: dr.shoe }, shin);
+			strand(`M${x - 0.7} 61.3 Q${x + 0.6} 62.4 ${x + 1.8} 62.2 M${x - 0.6} 60.5 L${x + 0.7} 60.9`, shin, 0.38, dr.shoe);
+			return { g, shin };
 		};
-		p.legL = leg(21);
-		p.legR = leg(27);
+		const lL = leg(22.4), lR = leg(25.6);
+		p.legL = lL.g;
+		p.shinL = lL.shin;
+		p.legR = lR.g;
+		p.shinR = lR.shin;
 
-		// Body: neck, sailor shirt, collar and bow, pleated skirt.
+		// Skirt: its own group so sitting can drape it over her lap.
+		p.skirt = node(doc, "g", {}, rig);
+		const hem = dr.hem, fl = dr.flare;
+		const skirtD = `M20.1 29.5 L27.9 29.5 Q${28.5 + fl * 0.5} ${(29.5 + hem) / 2} ${28 + fl} ${hem} Q${26 + fl * 0.3} ${hem + 1} 24 ${hem + 0.6} Q${22 - fl * 0.3} ${hem + 1} ${20 - fl} ${hem} Q${19.5 - fl * 0.5} ${(29.5 + hem) / 2} 20.1 29.5 Z`;
+		node(doc, "path", ln({ d: skirtD, fill: print }), p.skirt);
+		node(doc, "path", { d: skirtD, fill: url("fold") }, p.skirt);
+		for (const [a, b] of [[22.2, 21 - fl * 0.55], [24.2, 24.4], [26.1, 27 + fl * 0.55]]) strand(`M${a} 31 Q${(a + b) / 2 + 0.3} ${(31 + hem) / 2} ${b} ${hem + 0.3}`, p.skirt, 0.5, "#000000", 0.16);
+
+		// Neck and bodice with a gentle waist; sash at the waist.
 		p.body = node(doc, "g", {}, rig);
-		node(doc, "rect", { x: 22.4, y: 30, width: 3.2, height: 5, fill: SKIN }, p.body);
-		node(doc, "path", ln({ d: "M16 44 L32 44 L35.5 53 Q24 55.5 12.5 53 Z", fill: NAVY }), p.body);
-		node(doc, "path", { d: "M20 45 L18.5 53.5 M24 45 L24 54.5 M28 45 L29.5 53.5", stroke: "#24396b", "stroke-width": 0.8, fill: "none" }, p.body);
-		node(doc, "path", ln({ d: "M18.5 34 L29.5 34 L31.5 45.5 L16.5 45.5 Z", fill: "#ffffff" }), p.body);
-		node(doc, "path", ln({ d: "M18.3 34 L24 39.5 L29.7 34 L31.2 37.2 L24 42.5 L16.8 37.2 Z", fill: NAVY }), p.body);
-		node(doc, "path", ln({ d: "M24 40.5 L20.2 38.4 L20.6 42.6 Z M24 40.5 L27.8 38.4 L27.4 42.6 Z", fill: RED }), p.body);
-		node(doc, "circle", ln({ cx: 24, cy: 40.5, r: 1.2, fill: RED }), p.body);
+		node(doc, "path", { d: "M22.75 12.4 L25.25 12.4 L25.5 17.6 L22.5 17.6 Z", fill: url("skin") }, p.body);
+		node(doc, "path", { d: "M22.75 13.2 Q24 14.9 25.25 13.2 L25.3 14.6 Q24 15.6 22.7 14.6 Z", fill: SKIN_SHADE, opacity: 0.55 }, p.body);
+		const bodiceD = "M19.1 17.9 Q20 17.1 22.3 16.95 Q24 19.1 25.7 16.95 Q28 17.1 28.9 17.9 Q29.2 20.6 28.3 23.1 Q27.7 26.4 27.95 30 L20.05 30 Q20.3 26.4 19.7 23.1 Q18.8 20.6 19.1 17.9 Z";
+		node(doc, "path", ln({ d: bodiceD, fill: print }), p.body);
+		node(doc, "path", { d: bodiceD, fill: url("fold") }, p.body);
+		strand("M20.6 21.6 Q21.9 22.9 23.4 22.3 M24.6 22.3 Q26.1 22.9 27.4 21.6", p.body, 0.4, "#000000", 0.2);
+		node(doc, "path", { d: "M22.3 16.95 Q24 19.1 25.7 16.95 Q24 18.3 22.3 16.95 Z", fill: url("drop") }, p.body);
+		if (dr.collar) strand("M22.4 17.1 L25.5 22.6 M25.6 17.1 L23.6 20.8", p.body, 0.7, "#f1efe8");
+		node(doc, "path", ln({ d: `M19.75 ${29.9 - dr.sashH} Q24 ${29.4 - dr.sashH} 28.25 ${29.9 - dr.sashH} L28.3 30 Q24 30.5 19.7 30 Z`, fill: dr.sash }), p.body);
+		if (dr.collar) node(doc, "rect", { x: 19.9, y: 29.9 - dr.sashH * 0.55, width: 8.2, height: 0.45, fill: "#f0cf78", opacity: 0.8 }, p.body);
+		else node(doc, "path", ln({ d: "M27.4 29.3 Q28.8 30.6 29.4 32.4 L28.4 32.2 Q28 30.8 27.2 30 Z", fill: dr.sash }), p.body);
 
-		// Head: back hair, face, eyes, mouth, bangs, ribbon and a cowlick.
+		// Head: curly crown, ears, an oval face with a jaw.
 		p.head = node(doc, "g", {}, rig);
-		node(doc, "path", ln({ d: "M10 20 Q8.5 31 12.5 33.5 L35.5 33.5 Q39.5 31 38 20 Z", fill: h.base }), p.head);
-		node(doc, "circle", ln({ cx: 24, cy: 18.5, r: 14, fill: h.base }), p.head);
-		node(doc, "circle", { cx: 11, cy: 13.5, r: 1.9, fill: RED, stroke: INK, "stroke-width": 0.9 }, p.head);
-		node(doc, "circle", { cx: 37, cy: 13.5, r: 1.9, fill: RED, stroke: INK, "stroke-width": 0.9 }, p.head);
-		node(doc, "ellipse", ln({ cx: 24, cy: 21, rx: 11.5, ry: 11, fill: SKIN }), p.head);
-		node(doc, "ellipse", { cx: 17.2, cy: 27, rx: 2, ry: 1.1, fill: "#ff9db1", opacity: 0.65 }, p.head);
-		node(doc, "ellipse", { cx: 30.8, cy: 27, rx: 2, ry: 1.1, fill: "#ff9db1", opacity: 0.65 }, p.head);
+		node(doc, "path", ln({ d: curly(24, 6.6, 6.6, 5.6, 22, 1.1), fill: url("hair") }), p.head);
+		strand(curlTexture(24, 5.5, 6, 4, 14, 3, 0.6), p.head, 0.28, h.shade, 0.7);
+		for (const x of [19.55, 28.45]) node(doc, "ellipse", ln({ cx: x, cy: 9.3, rx: 0.6, ry: 1, fill: SKIN }), p.head);
+		const faceD = "M19.75 7.9 Q19.8 3.7 24 3.6 Q28.2 3.7 28.25 7.9 Q28.3 11.3 26.4 13.1 Q25.1 14.3 24 14.3 Q22.9 14.3 21.6 13.1 Q19.7 11.3 19.75 7.9 Z";
+		node(doc, "path", ln({ d: faceD, fill: url("face") }), p.head);
+		node(doc, "ellipse", { cx: 21.3, cy: 10.4, rx: 0.9, ry: 0.45, fill: SKIN_LIGHT, opacity: 0.4 }, p.head);
+		node(doc, "ellipse", { cx: 26.7, cy: 10.4, rx: 0.9, ry: 0.45, fill: SKIN_LIGHT, opacity: 0.3 }, p.head);
+		node(doc, "ellipse", { cx: 21.5, cy: 11, rx: 0.85, ry: 0.45, fill: "#b8544c", opacity: 0.22 }, p.head);
+		node(doc, "ellipse", { cx: 26.5, cy: 11, rx: 0.85, ry: 0.45, fill: "#b8544c", opacity: 0.22 }, p.head);
+		// Nose: a soft shadow down the side, a highlight and the nostrils.
+		strand("M24.45 8.6 Q24.7 10.1 24.5 10.8", p.head, 0.3, SKIN_SHADE, 0.6);
+		node(doc, "ellipse", { cx: 23.95, cy: 10.2, rx: 0.22, ry: 0.5, fill: SKIN_LIGHT, opacity: 0.7 }, p.head);
+		strand("M23.35 11.05 Q23.6 11.35 23.85 11.15 M24.15 11.15 Q24.4 11.35 24.65 11.05", p.head, 0.25, LINE, 0.7);
 
+		// Eyes: almond-shaped, the iris clipped by the lids; lashes and creases.
 		p.eyes = {};
 		p.eyes.open = node(doc, "g", {}, p.head);
-		p.pupils = node(doc, "g", {}, p.eyes.open);
-		for (const x of [19.4, 28.6]) {
-			node(doc, "ellipse", { cx: x, cy: 23, rx: 2.5, ry: 3.3, fill: INK }, p.pupils);
-			node(doc, "ellipse", { cx: x, cy: 24, rx: 1.9, ry: 2.1, fill: h.eye }, p.pupils);
-			node(doc, "circle", { cx: x - 0.8, cy: 21.8, r: 1, fill: "#ffffff" }, p.pupils);
-			node(doc, "circle", { cx: x + 0.9, cy: 24.9, r: 0.45, fill: "#ffffff" }, p.pupils);
-			node(doc, "path", { d: `M${x - 3} 20.4 Q${x} 18.6 ${x + 3} 20.4`, stroke: INK, "stroke-width": 1.3, fill: "none", "stroke-linecap": "round" }, p.eyes.open);
+		p.pupils = [];
+		for (const [x, out, n] of [[22.2, -1, "eyeL"], [25.8, 1, "eyeR"]]) {
+			node(doc, "path", { d: almond(x), fill: "#f4ece6" }, p.eyes.open);
+			const clip = node(doc, "g", { "clip-path": url(n) }, p.eyes.open);
+			const iris = node(doc, "g", {}, clip);
+			node(doc, "circle", { cx: x, cy: 9.05, r: 0.62, fill: url("iris") }, iris);
+			node(doc, "circle", { cx: x, cy: 9.05, r: 0.27, fill: "#140a06" }, iris);
+			node(doc, "circle", { cx: x - 0.22, cy: 8.8, r: 0.15, fill: "#ffffff", opacity: 0.9 }, iris);
+			node(doc, "path", { d: `M${x - 1.15} 9.1 Q${x - 0.2} 8.15 ${x + 1.15} 8.95 L${x + 1.15} 8.7 Q${x - 0.2} 7.95 ${x - 1.15} 8.85 Z`, fill: "#000000", opacity: 0.25 }, clip);
+			p.pupils.push(iris);
+			const outer = out > 0 ? x + 1.15 : x - 1.15, inner = out > 0 ? x - 1.15 : x + 1.15;
+			strand(`M${inner} ${out > 0 ? 9.1 : 8.95} Q${x - 0.2 * out} 8.05 ${outer} ${out > 0 ? 8.95 : 9.1} l${0.42 * out} -0.32`, p.eyes.open, 0.42, LINE);
+			strand(`M${x - 1} 8.15 Q${x - 0.1} 7.55 ${x + 1} 8.05`, p.eyes.open, 0.18, SKIN_SHADE, 0.8);
+			strand(`M${x - 0.7} 9.75 Q${x + 0.1} 9.95 ${x + 0.9} 9.6`, p.eyes.open, 0.15, LINE, 0.5);
 		}
-		const eyeLines = (d) => node(doc, "path", { d, stroke: INK, "stroke-width": 1.2, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round", display: "none" }, p.head);
-		p.eyes.closed = eyeLines("M16.9 23.4 Q19.4 25.4 21.9 23.4 M26.1 23.4 Q28.6 25.4 31.1 23.4");
-		p.eyes.happy = eyeLines("M16.9 24.4 Q19.4 21.2 21.9 24.4 M26.1 24.4 Q28.6 21.2 31.1 24.4");
-		p.eyes.x = eyeLines("M17.6 21.4 L21.2 25 M21.2 21.4 L17.6 25 M26.8 21.4 L30.4 25 M30.4 21.4 L26.8 25");
+		const eyeLines = (d) => node(doc, "path", { d, stroke: LINE, "stroke-width": 0.38, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round", display: "none" }, p.head);
+		p.eyes.closed = eyeLines("M21.05 9.05 Q22.2 9.75 23.35 9.0 M24.65 9.0 Q25.8 9.75 26.95 9.05 M21.2 9.25 l-0.3 0.35 M26.8 9.25 l0.3 0.35");
+		p.eyes.happy = eyeLines("M21.05 9.4 Q22.2 8.45 23.35 9.4 M24.65 9.4 Q25.8 8.45 26.95 9.4");
+		p.eyes.x = eyeLines("M21.6 8.45 L22.8 9.65 M22.8 8.45 L21.6 9.65 M25.2 8.45 L26.4 9.65 M26.4 8.45 L25.2 9.65");
 		p.eyes.wide = node(doc, "g", { display: "none" }, p.head);
-		for (const x of [19.4, 28.6]) {
-			node(doc, "ellipse", { cx: x, cy: 23, rx: 2.6, ry: 3.4, fill: "#ffffff", stroke: INK, "stroke-width": 1.1 }, p.eyes.wide);
-			node(doc, "circle", { cx: x, cy: 23.2, r: 1.1, fill: INK }, p.eyes.wide);
+		for (const x of [22.2, 25.8]) {
+			node(doc, "ellipse", { cx: x, cy: 9, rx: 1.1, ry: 0.85, fill: "#f4ece6", stroke: LINE, "stroke-width": 0.35 }, p.eyes.wide);
+			node(doc, "circle", { cx: x, cy: 9.05, r: 0.42, fill: url("iris") }, p.eyes.wide);
+			node(doc, "circle", { cx: x, cy: 9.05, r: 0.18, fill: "#140a06" }, p.eyes.wide);
 		}
+		// Brows: full, tapered.
+		node(doc, "path", { d: "M20.8 7.55 Q21.8 6.55 23.35 6.9 L23.3 7.25 Q21.9 7.0 20.95 7.75 Z", fill: LINE }, p.head);
+		node(doc, "path", { d: "M27.2 7.55 Q26.2 6.55 24.65 6.9 L24.7 7.25 Q26.1 7.0 27.05 7.75 Z", fill: LINE }, p.head);
 
+		// Lips: cupid's bow on top, a fuller lower lip with a little gloss.
 		p.mouth = {};
-		p.mouth.smile = node(doc, "path", { d: "M22.4 28.2 Q24 29.6 25.6 28.2", stroke: INK, "stroke-width": 1, fill: "none", "stroke-linecap": "round" }, p.head);
-		p.mouth.open = node(doc, "ellipse", { cx: 24, cy: 28.8, rx: 1.3, ry: 1.6, fill: "#c2475e", stroke: INK, "stroke-width": 0.8, display: "none" }, p.head);
-		p.mouth.wavy = node(doc, "path", { d: "M21.8 28.8 q1.1 -1.1 2.2 0 q1.1 1.1 2.2 0", stroke: INK, "stroke-width": 1, fill: "none", "stroke-linecap": "round", display: "none" }, p.head);
-		p.mouth.cat = node(doc, "path", { d: "M22 28 Q23 29.4 24 28 Q25 29.4 26 28", stroke: INK, "stroke-width": 1, fill: "none", "stroke-linecap": "round", display: "none" }, p.head);
+		p.mouth.smile = node(doc, "g", {}, p.head);
+		node(doc, "path", { d: "M22.85 12.15 Q23.4 11.65 23.85 11.85 L24 11.95 L24.15 11.85 Q24.6 11.65 25.15 12.15 Q24 12.3 22.85 12.15 Z", fill: LIP_TOP }, p.mouth.smile);
+		node(doc, "path", { d: "M22.85 12.15 Q24 12.3 25.15 12.15 Q24.7 13.05 24 13.05 Q23.3 13.05 22.85 12.15 Z", fill: LIP_LOW }, p.mouth.smile);
+		strand("M22.9 12.17 Q24 12.35 25.1 12.17", p.mouth.smile, 0.2, LINE, 0.8);
+		node(doc, "ellipse", { cx: 24.3, cy: 12.62, rx: 0.32, ry: 0.13, fill: "#ffffff", opacity: 0.35 }, p.mouth.smile);
+		p.mouth.open = node(doc, "g", { display: "none" }, p.head);
+		node(doc, "path", { d: "M23.1 12.1 Q24 11.6 24.9 12.1 Q24.8 13.3 24 13.35 Q23.2 13.3 23.1 12.1 Z", fill: "#3e1a1c", stroke: LIP_LOW, "stroke-width": 0.35 }, p.mouth.open);
+		p.mouth.wavy = node(doc, "path", { d: "M23 12.3 q0.5 -0.45 1 0 q0.5 0.45 1 0", stroke: LIP_TOP, "stroke-width": 0.42, fill: "none", "stroke-linecap": "round", display: "none" }, p.head);
+		p.mouth.cat = node(doc, "g", { display: "none" }, p.head);
+		node(doc, "path", { d: "M23.1 12.15 Q24 12.05 24.9 12.15 Q24.5 12.75 24 12.75 Q23.5 12.75 23.1 12.15 Z", fill: LIP_LOW }, p.mouth.cat);
+		strand("M23.1 12.15 Q24 12.0 24.9 12.15", p.mouth.cat, 0.22, LIP_TOP);
 
-		node(doc, "path", ln({ d: "M10.5 20 Q11 6.5 24 5.5 Q37 6.5 37.5 20 L34.6 15.2 L31.6 19.6 L28.6 12.8 L24.6 18 L20.6 12.8 L17.2 19.6 L14 15.2 Z", fill: h.base }), p.head);
-		node(doc, "path", { d: "M15 12 Q19 8.5 23 9", stroke: "#ffffff", "stroke-width": 1, opacity: 0.55, fill: "none", "stroke-linecap": "round" }, p.head);
-		node(doc, "path", ln({ d: "M24 5.8 Q26.5 0.5 29.5 2.2 Q26.5 2.6 25.4 6", fill: h.base }), p.head);
-		const bow = node(doc, "g", {}, p.head);
-		node(doc, "path", ln({ d: "M33 8 L29.6 5 L29.4 10.4 Z M33 8 L36.6 5.4 L36.4 10.8 Z", fill: RED }), bow);
-		node(doc, "circle", ln({ cx: 33, cy: 8, r: 1.3, fill: RED }), bow);
-		// Arms (pivot at the shoulders), in front of the head so raised hands show.
-		const arm = (x) => {
-			const g = node(doc, "g", {}, rig);
-			node(doc, "rect", ln({ x: x - 1.5, y: 35.5, width: 3, height: 9.5, rx: 1.4, fill: SKIN }), g);
-			node(doc, "rect", ln({ x: x - 2, y: 34.5, width: 4, height: 4.5, rx: 1.6, fill: "#ffffff" }), g);
-			node(doc, "circle", ln({ cx: x, cy: 45.6, r: 1.8, fill: SKIN }), g);
+		// A soft curly fringe over the forehead, a few curls falling at the temples.
+		node(doc, "path", ln({ d: "M19.7 8.4 Q19.3 3.2 24 2.9 Q28.7 3.2 28.3 8.4 Q27.9 6.6 27 6.1 Q26.6 5.2 25.6 5.5 Q24.9 4.6 24 5.1 Q23.1 4.6 22.4 5.5 Q21.4 5.2 21 6.1 Q20.1 6.6 19.7 8.4 Z", fill: url("hair") }), p.head);
+		strand("M21.1 5.9 a0.6 0.6 0 1 1 1 0.4 M24.1 5.1 a0.6 0.6 0 1 1 1 0.4 M26.1 5.6 a0.55 0.55 0 1 0 -0.9 0.4", p.head, 0.25, h.sheen, 0.45);
+		strand("M19.9 7.4 q-0.9 0.9 -0.2 1.8 q0.8 0.8 -0.2 1.7", p.head, 0.42);
+		strand("M28.1 7.4 q0.9 0.9 0.2 1.8 q-0.8 0.8 0.2 1.7", p.head, 0.42);
+
+		// Loose ringlets falling over her shoulders; they swing as she moves.
+		p.locks = node(doc, "g", {}, rig);
+		const lock = (x, dir, seed) => {
+			const g = node(doc, "g", {}, p.locks);
+			node(doc, "path", ln({ d: curly(x + dir * 0.6, 15.6, 2.3, 8.2, 16, 0.9), fill: url("hair") }), g);
+			strand(curlTexture(x + dir * 0.6, 15.6, 2, 7.6, 12, seed, 0.55), g, 0.28, h.shade, 0.75);
+			strand(`M${x + dir * 1.4} 19 q${dir * 1.4} 0.8 ${dir * 0.4} 2 q${-dir * 1.2} 1 ${dir * 0.2} 2.2 q${dir * 1} 0.6 ${dir * 0.1} 1.6`, g, 0.55, h.base);
+			strand(`M${x + dir * 0.2} 13 q${-dir * 0.9} 0.7 0 1.6`, g, 0.3, h.sheen, 0.45);
 			return g;
 		};
-		p.armL = arm(18.5);
-		p.armR = arm(29.5);
+		p.tailL = lock(18.9, -1, 11);
+		p.tailR = lock(29.1, 1, 23);
 
+		// Arms: upper arm pivots at the shoulder, forearm at the elbow.
+		const arm = (x, out) => {
+			const g = node(doc, "g", {}, rig);
+			node(doc, "path", ln({ d: `M${x - 1.05} 18.6 Q${x - 1.2} 22 ${x - 0.85} 25.6 L${x + 0.85} 25.6 Q${x + 1.15} 22 ${x + 1.05} 18.6 Z`, fill: url("skin") }), g);
+			const fore = node(doc, "g", {}, g);
+			node(doc, "path", ln({ d: `M${x - 0.85} 25.2 Q${x - 1} 27.5 ${x - 0.55} 30.6 L${x + 0.55} 30.6 Q${x + 0.95} 27.5 ${x + 0.85} 25.2 Z`, fill: url("skin") }), fore);
+			node(doc, "path", ln({ d: `M${x - 0.6} 30.3 Q${x - 0.95} 31.6 ${x - 0.45} 32.7 Q${x + 0.1} 33.2 ${x + 0.55} 32.6 Q${x + 0.85} 31.5 ${x + 0.6} 30.3 Z`, fill: SKIN }), fore);
+			strand(`M${x + 0.55 * out} 30.8 q${0.45 * out} 0.5 ${0.25 * out} 1.1`, fore, 0.22, LINE, 0.7);
+			if (dr.sleeve === "wide") {
+				node(doc, "path", ln({ d: `M${x - 1.6} 17.6 L${x + 1.6} 17.6 L${x + 2.3} 26.8 Q${x} 27.6 ${x - 2.3} 26.8 Z`, fill: print }), g);
+				node(doc, "path", { d: `M${x - 1.6} 17.6 L${x + 1.6} 17.6 L${x + 2.3} 26.8 Q${x} 27.6 ${x - 2.3} 26.8 Z`, fill: url("fold") }, g);
+			} else {
+				node(doc, "path", ln({ d: `M${x - 1.75} 20.6 Q${x - 2.2} 18 ${x} 17.5 Q${x + 2.2} 18 ${x + 1.75} 20.6 Q${x} 21.4 ${x - 1.75} 20.6 Z`, fill: print }), g);
+				node(doc, "path", { d: `M${x - 1.75} 20.6 Q${x - 2.2} 18 ${x} 17.5 Q${x + 2.2} 18 ${x + 1.75} 20.6 Q${x} 21.4 ${x - 1.75} 20.6 Z`, fill: url("fold") }, g);
+			}
+			return { g, fore };
+		};
+		const aL = arm(19.85, -1), aR = arm(28.15, 1);
+		p.armL = aL.g;
+		p.foreL = aL.fore;
+		p.armR = aR.g;
+		p.foreR = aR.fore;
 		return p;
 	}
 
-	const PIVOT = { legL: [21, 49.5], legR: [27, 49.5], armL: [18.5, 35.8], armR: [29.5, 35.8], tailL: [11, 13.5], tailR: [37, 13.5] };
+	const PIVOT = {
+		legL: [22.4, 32.6], legR: [25.6, 32.6], shinL: [22.4, 47.2], shinR: [25.6, 47.2],
+		armL: [19.85, 18.8], armR: [28.15, 18.8], foreL: [19.85, 25.4], foreR: [28.15, 25.4],
+		tailL: [19.4, 8.2], tailR: [28.6, 8.2],
+	};
+	const JOINTS = { legL: "legL", legR: "legR", shinL: "kneeL", shinR: "kneeR", armL: "armL", armR: "armR", foreL: "elbowL", foreR: "elbowR", tailL: "tailL", tailR: "tailR" };
 
-	/** Poses the parts. Angles in degrees; 0 = hanging down, -90 = pointing forward (towards where she faces). */
+	/**
+	 * Poses the parts. Angles in degrees; 0 = hanging down, -90 = pointing
+	 * forward (where she faces). Knees bend with positive angles, elbows with
+	 * negative ones.
+	 */
 	function applyPose(p, q) {
-		for (const k of ["legL", "legR", "armL", "armR", "tailL", "tailR"]) {
-			const [px, py] = PIVOT[k];
-			p[k].setAttribute("transform", `rotate(${(q[k] || 0).toFixed(1)} ${px} ${py})`);
+		for (const part in JOINTS) {
+			const [px, py] = PIVOT[part];
+			p[part].setAttribute("transform", `rotate(${(q[JOINTS[part]] || 0).toFixed(1)} ${px} ${py})`);
 		}
-		const tilt = `rotate(${(q.headTilt || 0).toFixed(1)} 24 33)`;
+		const tilt = `rotate(${(q.headTilt || 0).toFixed(1)} 24 14)`;
 		p.head.setAttribute("transform", tilt);
 		p.tails.setAttribute("transform", tilt);
+		p.locks.setAttribute("transform", tilt);
+		const lap = q.lap || 0;
+		p.skirt.setAttribute("transform", `translate(24 30.5) rotate(${(-lap * 80).toFixed(1)}) skewX(${(q.skirtSway || 0).toFixed(1)}) scale(${(1 - Math.min(1, lap) * 0.55).toFixed(3)} ${(1 - Math.min(1, lap) * 0.3).toFixed(3)}) translate(-24 -30.5)`);
 		const sx = q.sx || 1, sy = q.sy || 1;
 		p.rig.setAttribute("transform", `translate(${(q.dx || 0).toFixed(2)} ${(q.bob || 0).toFixed(2)}) translate(24 64) rotate(${(q.rot || 0).toFixed(1)}) scale(${sx.toFixed(3)} ${sy.toFixed(3)}) translate(-24 -64)`);
 		for (const k in p.eyes) p.eyes[k].setAttribute("display", k === (q.eyes || "open") ? "inline" : "none");
 		for (const k in p.mouth) p.mouth[k].setAttribute("display", k === (q.mouth || "smile") ? "inline" : "none");
-		p.pupils.setAttribute("transform", `translate(${(q.lookX || 0).toFixed(2)} ${(q.lookY || 0).toFixed(2)})`);
+		const look = `translate(${((q.lookX || 0) * 0.42).toFixed(2)} ${((q.lookY || 0) * 0.18).toFixed(2)})`;
+		for (const iris of p.pupils) iris.setAttribute("transform", look);
 	}
 
 	kit.createSvg = createSvg;
@@ -220,7 +364,7 @@
 		let parts = null;
 		function build() {
 			sprite.replaceChildren();
-			parts = createSvg(doc, cfg.hair);
+			parts = createSvg(doc, cfg.hair, cfg.dress);
 			sprite.appendChild(parts.svg);
 			sprite.title = `${cfg.name} (drag me!)`;
 		}
@@ -238,12 +382,12 @@
 			S = cfg.size / 64;
 			H = cfg.size;
 			SW = 48 * S;
-			HALF = 15 * S;
-			REACH = H * 2.4;
-			JUMPX = H * 2.2;
+			HALF = 9 * S;
+			REACH = H * 1.7;
+			JUMPX = H * 1.6;
 			const e = cfg.energy === "calm" ? 0.75 : cfg.energy === "hyper" ? 1.4 : 1;
-			WALK = 62 * S * e;
-			CLIMB = 46 * S * e;
+			WALK = 40 * S * e;
+			CLIMB = 28 * S * e;
 			sprite.style.width = SW + "px";
 			sprite.style.height = H + "px";
 		}
@@ -446,6 +590,7 @@
 			st.t = 0;
 			st.dur = dur == null ? decisionGap() : dur;
 			if (m !== "sit" && m !== "sleep") st.sat = null;
+			if (m !== "ouch" && m !== "sleep" && m !== "wave") st.fxKind = "";
 		}
 		const grounded = () => ["idle", "walk", "sit", "sleep", "wave", "poke", "watch", "land", "ouch", "peek", "look"].includes(st.mode);
 		const calm = () => ["idle", "walk", "sit", "watch", "look"].includes(st.mode);
@@ -939,184 +1084,291 @@
 		}
 
 		// ---- drawing
+		// Hips sit 31 units above her feet: sitting lowers her by that much.
+		const SIT = 31;
+		let glance = { x: 0, y: 0, at: 0 };
 		function pose() {
 			const t = clock;
 			const q = { eyes: st.blink > 0 ? "closed" : "open", mouth: "smile", bob: 0 };
-			// Eyes follow the cursor (in her own facing frame).
+			// Eyes follow the cursor (in her own facing frame), with small darting glances.
+			if (clock > glance.at) glance = { x: rnd(-0.35, 0.35), y: rnd(-0.3, 0.3), at: clock + rnd(0.7, 2.6) };
 			if (input.x >= 0 && performance.now() - input.t < 6000) {
-				q.lookX = clamp(((input.x - st.x) / 160) * st.face, -1, 1) * 1.1;
-				q.lookY = clamp((input.y - (st.y - H * 0.7)) / 180, -1, 1) * 0.9;
+				q.lookX = clamp(((input.x - st.x) / 160) * st.face, -1, 1) + glance.x * 0.4;
+				q.lookY = clamp((input.y - (st.y - H * 0.85)) / 180, -1, 1) + glance.y * 0.4;
 			} else {
-				q.lookX = Math.sin(t * 0.7) * 0.6;
+				q.lookX = glance.x * 2;
+				q.lookY = glance.y;
 			}
-			const breathe = Math.sin(t * 2.4) * 0.35;
-			const sway = Math.sin(t * 1.7) * 6;
-			q.tailL = 4 + sway * 0.6;
-			q.tailR = -4 + sway * 0.6;
+			const breathe = Math.sin(t * 2.2);
+			q.tailL = 3 + Math.sin(t * 1.3) * 2;
+			q.tailR = -3 + Math.sin(t * 1.3 + 0.6) * 2;
+			// Relaxed standing: weight shifts slowly from foot to foot.
+			const shift = Math.sin(t * 0.45);
+			q.legL = 2 + shift * 2;
+			q.legR = -2 + shift * 2;
+			q.kneeL = shift > 0 ? 0 : -shift * 6;
+			q.kneeR = shift > 0 ? shift * 6 : 0;
+			q.armL = 5 + breathe * 1.2;
+			q.armR = -5 - breathe * 1.2;
+			q.elbowL = -8;
+			q.elbowR = -8;
+			q.bob = breathe * 0.12 + Math.abs(shift) * 0.25;
+			q.rot = shift * 1.2;
+			q.headTilt = Math.sin(t * 0.6) * 2.5;
+			const sitStretched = (kick) => {
+				q.bob = SIT;
+				q.legL = -88 + kick;
+				q.legR = -84 - kick;
+				q.kneeL = 4;
+				q.kneeR = 6;
+				q.lap = 1;
+				q.rot = 0;
+			};
+			const sitKneesUp = () => {
+				q.bob = SIT;
+				q.legL = -128;
+				q.legR = -122;
+				q.kneeL = 74;
+				q.kneeR = 70;
+				q.lap = 1.4;
+				q.rot = 0;
+			};
 			switch (st.mode) {
 				case "walk": {
-					const ph = t * 9 * (WALK / (62 * S));
-					q.legL = Math.sin(ph) * 26;
-					q.legR = -Math.sin(ph) * 26;
-					q.armL = -Math.sin(ph) * 22;
-					q.armR = Math.sin(ph) * 22;
-					q.bob = -Math.abs(Math.cos(ph)) * 1.4;
-					q.tailL = q.tailR = 14 + Math.sin(ph * 2) * 5;
-					q.lookX = 0.9;
+					const ph = t * 6.5 * (WALK / (40 * S));
+					const s1 = Math.sin(ph), c1 = Math.cos(ph);
+					q.legL = s1 * 24;
+					q.legR = -s1 * 24;
+					q.kneeL = 6 + Math.max(0, c1) * 34;
+					q.kneeR = 6 + Math.max(0, -c1) * 34;
+					q.armL = -s1 * 18;
+					q.armR = s1 * 18;
+					q.elbowL = -12 - Math.max(0, -s1) * 18;
+					q.elbowR = -12 - Math.max(0, s1) * 18;
+					q.bob = Math.abs(s1) * 0.7;
+					q.rot = 2;
+					q.headTilt = Math.sin(ph * 2) * 1.2;
+					q.skirtSway = -5 + Math.sin(ph * 2) * 2.5;
+					q.tailL = q.tailR = 6 + Math.sin(ph * 2) * 3;
+					q.lookX = 0.8 + glance.x * 0.3;
 					break;
 				}
 				case "climb":
 				case "hang": {
-					const ph = t * 6;
 					const climbing = st.mode === "climb";
-					q.armL = climbing ? 128 + Math.sin(ph) * 14 : 132;
-					q.armR = climbing ? -128 + Math.sin(ph) * 14 : -132;
-					q.legL = climbing ? -25 + Math.sin(ph) * 25 : Math.sin(t * 2.2) * 14;
-					q.legR = climbing ? -10 - Math.sin(ph) * 25 : -Math.sin(t * 2.2) * 14;
-					q.rot = climbing ? 6 : Math.sin(t * 2.2) * 4;
+					const ph = t * 5;
+					const s1 = Math.sin(ph);
+					q.armL = climbing ? 150 + s1 * 18 : 165;
+					q.armR = climbing ? -150 + s1 * 18 : -165;
+					q.elbowL = climbing ? -25 - Math.max(0, s1) * 35 : -6;
+					q.elbowR = climbing ? -25 - Math.max(0, -s1) * 35 : -6;
+					q.legL = climbing ? -45 + s1 * 28 : Math.sin(t * 1.8) * 10;
+					q.legR = climbing ? -45 - s1 * 28 : -Math.sin(t * 1.8) * 10;
+					q.kneeL = climbing ? 55 - s1 * 25 : 10 + Math.sin(t * 1.8) * 8;
+					q.kneeR = climbing ? 55 + s1 * 25 : 10 - Math.sin(t * 1.8) * 8;
+					q.rot = climbing ? 7 : Math.sin(t * 1.8) * 3;
+					q.dx = 1.8;
+					q.bob = 0;
 					q.lookX = climbing ? 1 : q.lookX;
-					q.lookY = climbing ? -0.8 : q.lookY;
-					q.dx = 2.5;
+					q.lookY = climbing ? -1 : q.lookY;
+					q.tailL = q.tailR = climbing ? -8 : Math.sin(t * 1.8) * -8;
 					if (!climbing) q.mouth = "cat";
 					break;
 				}
 				case "jump":
 				case "fall": {
-					const flail = Math.sin(t * 22) * 18;
-					const up = st.vy > 0;
-					q.armL = 130 + flail;
-					q.armR = -130 - flail;
-					q.legL = 18 + (up ? flail * 0.6 : 0);
-					q.legR = -18 - (up ? flail * 0.6 : 0);
-					q.tailL = up ? 150 : 40;
-					q.tailR = up ? -150 : -40;
-					q.eyes = up && st.why === "vanish" ? "wide" : st.why === "throw" ? "happy" : "open";
-					q.mouth = up ? "open" : "smile";
-					q.rot = st.why === "throw" ? clamp(st.vx / 40, -25, 25) : 0;
+					const flail = Math.sin(t * 16) * 16;
+					const down = st.vy > 0;
+					q.armL = 140 + flail;
+					q.armR = -140 - flail;
+					q.elbowL = -20;
+					q.elbowR = -20;
+					q.legL = down ? 14 + flail * 0.5 : -30;
+					q.legR = down ? -14 - flail * 0.5 : 10;
+					q.kneeL = down ? 20 : 60;
+					q.kneeR = down ? 25 : 30;
+					q.tailL = down ? 120 : 20;
+					q.tailR = down ? -120 : -20;
+					q.skirtSway = down ? 0 : -4;
+					q.eyes = st.why === "vanish" && down ? "wide" : st.why === "throw" ? "happy" : "open";
+					q.mouth = down ? "open" : "smile";
+					q.rot = st.why === "throw" ? clamp(st.vx / 50, -20, 20) : 0;
+					q.bob = 0;
 					break;
 				}
 				case "drag": {
-					const kick = Math.sin(t * 16) * 22;
-					q.armL = 135;
-					q.armR = -135;
-					q.legL = kick;
-					q.legR = -kick;
-					q.tailL = 20 + kick * 0.3;
-					q.tailR = -20 + kick * 0.3;
+					const kick = Math.sin(t * 12) * 20;
+					q.armL = 160;
+					q.armR = -160;
+					q.elbowL = q.elbowR = -10;
+					q.legL = kick - 10;
+					q.legR = -kick - 10;
+					q.kneeL = 30 + kick;
+					q.kneeR = 30 - kick;
+					q.tailL = 15;
+					q.tailR = -15;
 					q.eyes = "wide";
 					q.mouth = "open";
-					q.rot = clamp((st.drag ? st.drag.vx : 0) / -60, -30, 30);
+					q.rot = clamp((st.drag ? st.drag.vx : 0) / -70, -25, 25);
+					q.bob = 0;
 					break;
 				}
 				case "land": {
 					const k = 1 - clamp(st.t / Math.max(0.01, st.dur), 0, 1);
-					q.sy = 1 - 0.22 * k;
-					q.sx = 1 + 0.16 * k;
-					q.armL = 25 * k;
-					q.armR = -25 * k;
+					q.kneeL = q.kneeR = 40 * k;
+					q.legL = q.legR = -20 * k;
+					q.bob = 4 * k;
+					q.armL = 30 * k;
+					q.armR = -30 * k;
+					q.sy = 1 - 0.05 * k;
 					break;
 				}
-				case "ouch":
+				case "ouch": {
+					sitStretched(0);
+					q.eyes = "x";
+					q.mouth = "wavy";
+					q.headTilt = Math.sin(t * 4) * 6;
+					q.armR = -160;
+					q.elbowR = -110;
+					q.armL = 20;
+					q.elbowL = -40;
+					break;
+				}
 				case "sit":
 				case "sleep": {
-					q.bob = 12;
-					const edge = st.sat === "edge";
-					const kick = edge ? Math.sin(t * 3) * 18 : Math.sin(t * 1.5) * 4;
-					q.legL = edge ? kick : -84 + kick;
-					q.legR = edge ? -kick : -80 - kick;
-					q.armL = edge ? -10 : -35;
-					q.armR = edge ? 10 : -25;
-					if (st.mode === "ouch") {
-						q.eyes = "x";
-						q.mouth = "wavy";
-						q.headTilt = Math.sin(t * 5) * 7;
-						q.armR = -135;
-						q.legL = -84;
-						q.legR = -80;
-					} else if (st.mode === "sleep") {
+					if (st.sat === "edge") {
+						// On the edge of a window: thighs along the top, shins hanging over.
+						const kick = Math.sin(t * 2.4);
+						q.bob = SIT;
+						q.legL = -90;
+						q.legR = -86;
+						q.kneeL = 88 + kick * 16;
+						q.kneeR = 86 - kick * 16;
+						q.lap = 1;
+						q.armL = 25;
+						q.armR = -25;
+						q.elbowL = q.elbowR = -15;
+						q.rot = -3;
+					} else if (st.mode === "sleep") sitKneesUp();
+					else sitStretched(Math.sin(t * 1.2) * 4);
+					if (st.mode === "sleep") {
 						q.eyes = "closed";
-						q.mouth = "smile";
-						q.headTilt = 12 + breathe * 3;
-						q.bob = 12 + breathe;
+						q.headTilt = 16 + breathe * 2;
+						q.bob = SIT + breathe * 0.25;
+						q.armL = -110;
+						q.armR = -105;
+						q.elbowL = -70;
+						q.elbowR = -75;
 						q.tailL = q.tailR = 0;
 					} else {
-						q.headTilt = Math.sin(t * 0.9) * 5;
-						q.bob = 12 + breathe * 0.5;
+						q.headTilt = Math.sin(t * 0.8) * 4;
+						if (st.sat !== "edge") {
+							q.armL = 35;
+							q.armR = -20;
+							q.elbowL = -30;
+							q.elbowR = -20;
+						}
 					}
 					break;
 				}
+				case "watch": {
+					sitKneesUp();
+					q.armL = -105;
+					q.armR = -100;
+					q.elbowL = -80;
+					q.elbowR = -85;
+					q.headTilt = 4 + Math.sin(t * 5) * 1.2;
+					q.mouth = "cat";
+					break;
+				}
 				case "wave": {
-					q.armR = -135 + Math.sin(t * 12) * 18;
-					q.armL = 8;
+					q.armR = -155;
+					q.elbowR = -25 + Math.sin(t * 11) * 28;
+					q.armL = 6;
 					q.eyes = st.fxKind === "heart" ? "happy" : q.eyes;
 					q.mouth = "open";
-					q.headTilt = -6;
-					q.bob = breathe;
+					q.headTilt = -5;
 					break;
 				}
 				case "poke": {
-					const jab = (Math.sin(t * 10) + 1) / 2;
-					q.armR = -95 + jab * 10;
-					q.dx = jab * 1.2;
-					q.armL = 10;
-					q.lookX = 1.1;
+					const jab = (Math.sin(t * 9) + 1) / 2;
+					q.armR = -88;
+					q.elbowR = -35 + jab * 30;
+					q.armL = 8;
+					q.lookX = 1;
 					q.mouth = "cat";
+					q.rot = 3;
 					break;
 				}
 				case "poked": {
 					q.eyes = "happy";
 					q.mouth = "open";
-					q.armL = 30;
-					q.armR = -30;
-					q.sy = 1 - Math.max(0, 0.08 - st.t * 0.2);
-					q.headTilt = Math.sin(st.t * 14) * 6;
-					break;
-				}
-				case "watch": {
-					q.bob = 12;
-					q.legL = -84;
-					q.legR = -80;
-					q.armL = -60;
-					q.armR = -55;
-					q.headTilt = Math.sin(t * 6) * 2;
-					q.mouth = "cat";
+					q.armL = 25;
+					q.armR = -25;
+					q.elbowL = q.elbowR = -60;
+					q.headTilt = Math.sin(st.t * 12) * 5;
+					q.kneeL = q.kneeR = 10 * Math.max(0, 1 - st.t * 3);
 					break;
 				}
 				case "peek": {
-					const k = st.t < 0.5 ? st.t / 0.5 : st.t > st.dur - 0.4 ? clamp((st.dur - st.t) / 0.4, 0, 1) : 1;
-					q.bob = k * 36;
-					q.lookX = Math.sin(st.t * 2.2) * 1.1;
-					q.armL = 128;
-					q.armR = -128;
+					// Pops up from below the bottom edge, arms resting on it.
+					const k = st.t < 0.6 ? st.t / 0.6 : st.t > st.dur - 0.5 ? clamp((st.dur - st.t) / 0.5, 0, 1) : 1;
+					q.bob = 46 + (1 - k) * 18;
+					q.armL = -150;
+					q.armR = -145;
+					q.elbowL = -70;
+					q.elbowR = -75;
+					q.lookX = Math.sin(st.t * 1.8) * 1.1;
 					q.mouth = "cat";
+					q.headTilt = Math.sin(st.t * 1.8) * 4;
 					break;
 				}
 				case "look":
-					q.headTilt = Math.sin(t * 1.3) * 8;
-					q.lookX = Math.sin(t * 1.1) * 1.1;
-					q.armL = 6;
-					q.armR = -6;
+					q.headTilt = Math.sin(t * 1.1) * 7;
+					q.lookX = Math.sin(t * 0.9) * 1.1;
+					q.armL = 15;
+					q.elbowL = -100;
+					q.armR = -8;
 					break;
-				default:
-					q.bob = breathe;
-					q.armL = 6 + breathe * 2;
-					q.armR = -6 - breathe * 2;
 			}
 			return q;
 		}
 
-		function draw() {
-			const q = pose();
+		// Poses blend into each other instead of snapping; curls and skirt lag a little more.
+		const DISCRETE = { eyes: 1, mouth: 1 };
+		const cur = {};
+		function smooth(q, dt) {
+			for (const k in q) {
+				if (DISCRETE[k]) {
+					cur[k] = q[k];
+					continue;
+				}
+				const target = q[k];
+				if (cur[k] == null) {
+					cur[k] = target;
+					continue;
+				}
+				const rate = k.startsWith("tail") || k === "skirtSway" ? 7 : k === "bob" || k === "lap" ? 12 : 16;
+				cur[k] += (target - cur[k]) * (1 - Math.exp(-dt * rate));
+			}
+			for (const k in cur) {
+				if (!(k in q) && !DISCRETE[k]) cur[k] += ((k === "sx" || k === "sy" ? 1 : 0) - cur[k]) * (1 - Math.exp(-dt * 16));
+			}
+			return cur;
+		}
+
+		function draw(dt) {
+			const q = smooth(pose(), dt);
 			applyPose(parts, q);
 			const left = st.x - SW / 2;
 			const top = st.y - H;
 			sprite.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0) scaleX(${st.face})`;
-			// The peeking pose sinks below the bottom edge.
+			const lowered = ((q.bob || 0) / 64) * H; // sitting or peeking lowers her head
+			const headTop = top + lowered;
 			if (bubble.classList.contains("show")) {
 				const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
 				const bx = clamp(st.x - bw / 2, 4, vw - bw - 4);
-				const sitting = ["sit", "sleep", "ouch", "watch"].includes(st.mode);
-				const by = clamp(top - bh - 6 + (sitting ? H * 0.18 : 0), 4, vh - bh - 4);
+				const by = clamp(headTop - bh - 6, 4, vh - bh - 4);
 				bubble.style.transform = `translate3d(${bx.toFixed(1)}px, ${by.toFixed(1)}px, 0)`;
 			}
 			if (st.fxKind) {
@@ -1125,19 +1377,19 @@
 				let text, fxX, fxY;
 				if (st.fxKind === "stars") {
 					const a = clock * 6;
-					text = "\u2605 \u2726 \u2605";
+					text = "★ ✦ ★";
 					fxX = st.x - 18 + Math.cos(a) * 6;
-					fxY = top + H * 0.1 + Math.sin(a) * 3;
+					fxY = headTop - 4 + Math.sin(a) * 3;
 				} else if (st.fxKind === "zz") {
 					const k = (clock * 0.6) % 1;
 					text = k < 0.33 ? "z" : k < 0.66 ? "z Z" : "z Z z";
-					fxX = st.x + st.face * SW * 0.25;
-					fxY = top + H * 0.15 - k * 10;
+					fxX = st.x + st.face * SW * 0.2;
+					fxY = headTop - 6 - k * 10;
 				} else {
 					const k = (clock * 0.9) % 1;
-					text = "\u2665";
+					text = "♥";
 					fxX = st.x + Math.sin(clock * 5) * 6;
-					fxY = top - k * 20;
+					fxY = headTop - 8 - k * 20;
 				}
 				if (fx.textContent !== text) fx.textContent = text;
 				fx.style.transform = `translate3d(${fxX.toFixed(1)}px, ${fxY.toFixed(1)}px, 0)`;
@@ -1159,7 +1411,7 @@
 			}
 			try {
 				update(dt);
-				draw();
+				draw(dt);
 			} catch (err) {
 				// Never take Ledger down with her: reset to a safe state.
 				console.warn("desk-buddy:", err);
@@ -1182,7 +1434,7 @@
 				SEL = selectors();
 				known = new WeakSet();
 				firstScan = true;
-				if (before.hair !== cfg.hair) build();
+				if (before.hair !== cfg.hair || before.dress !== cfg.dress) build();
 				sizes();
 			},
 			say(text) {
@@ -1238,8 +1490,9 @@
 		const size = Number(c.size);
 		return {
 			name: typeof c.name === "string" && c.name.trim() ? c.name.trim().slice(0, 40) : "Hana",
-			hair: typeof c.hair === "string" && HAIR[c.hair] ? c.hair : "pink",
-			size: Number.isFinite(size) ? clamp(size, 48, 160) : 84,
+			hair: typeof c.hair === "string" && HAIR[c.hair] ? c.hair : "black",
+			size: Number.isFinite(size) ? clamp(size, 72, 220) : 120,
+			dress: typeof c.dress === "string" && DRESS[c.dress] ? c.dress : "ankara",
 			energy: ["calm", "normal", "hyper"].includes(c.energy) ? c.energy : "normal",
 			speech: c.speech !== false,
 			sleepAfter: Number.isFinite(Number(c.sleepAfter)) ? clamp(Number(c.sleepAfter), 15, 3600) : 120,
