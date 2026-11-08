@@ -1,7 +1,7 @@
 {
   "id": "desk-buddy",
   "name": "Desk Buddy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A little anime girl who climbs your Ledger windows while you work.",
   "ledger": ">=0.9.1",
   "server": "server.mjs",

@@ -3,8 +3,9 @@
 A [Ledger](https://github.com/mastifdogo/Bookeeping) module: a little
 companion who keeps you company while you do the books. She's a young woman
 with dark skin, brown eyes and loose, curly black hair, in a traditional
-dress (a West African wax-print Ankara dress, or a yukata), drawn in SVG with
-realistic proportions, soft shading and jointed limbs. She lives on top of
+dress (a West African wax-print Ankara dress, or a yukata), drawn in a crisp
+anime style in SVG: realistic proportions, cel shading, big detailed eyes,
+glossy hair with a rim light, and jointed limbs. She lives on top of
 Ledger's windows:
 
 - wanders along the bottom of the screen, peeks up from below it and follows
@@ -76,6 +77,9 @@ tag and create a GitHub Release from it.
 
 ## Changes
 
+- 0.3.0: high-definition anime style: cel shading, larger detailed anime eyes
+  with layered irises and catch-lights, glossy skin and lips, a highlight band
+  and rim light on her curls, crisper line art, slightly larger head.
 - 0.2.0: new look: realistic proportions, dark skin, brown eyes, loose curly
   black hair, traditional dress (Ankara or yukata, new Dress setting), soft
   shading, knees and elbows, smooth pose blending.

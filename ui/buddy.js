@@ -14,7 +14,7 @@
  */
 (function () {
 	"use strict";
-	const VERSION = "0.2.0";
+	const VERSION = "0.3.0";
 	const NS = "http://www.w3.org/2000/svg";
 	const kit = (window.__deskBuddyKit = window.__deskBuddyKit || {});
 	if (kit.version === VERSION && kit.start) return;
@@ -36,7 +36,7 @@
 		ankara: { ground: "#dd6229", motif: "#1d8686", ring: "#f3c443", dot: "#3b2a6e", sash: "#1d8686", sashH: 1.6, hem: 52, flare: 6, sleeve: "puff", shoe: "#5e3420" },
 		yukata: { ground: "#2c3e72", motif: "#f1efe8", ring: "#f2a5b7", dot: "#7f93c9", sash: "#c4403d", sashH: 4, hem: 60, flare: 1.4, sleeve: "wide", shoe: "#b98f66", collar: true },
 	};
-	const LINE = "#3a2119"; // warm, thin line art
+	const LINE = "#2b1510"; // crisp, dark-brown line art
 	const SKIN = "#7a4832";
 	const SKIN_SHADE = "#5a321f";
 	const SKIN_LIGHT = "#a26c4d";
@@ -76,6 +76,20 @@
 		return d;
 	}
 
+	/** Mixes two #rrggbb colours: t = 0 gives a, 1 gives b. */
+	function mix(a, b, t) {
+		const c = (h, i) => parseInt(h.slice(i, i + 2), 16);
+		let out = "#";
+		for (const i of [1, 3, 5]) out += Math.round(c(a, i) + (c(b, i) - c(a, i)) * t).toString(16).padStart(2, "0");
+		return out;
+	}
+
+	/** An anime eye: flatter top, the outer corner lifted. o = +1 for her right eye, -1 for her left. */
+	function eyeShape(x, o) {
+		const inner = x - 1.2 * o, outer = x + 1.28 * o;
+		return `M${inner} 9.0 Q${x - 0.5 * o} 7.9 ${x + 0.6 * o} 7.95 Q${outer} 8.05 ${outer} 8.75 Q${x + 0.5 * o} 10.05 ${x - 0.3 * o} 9.92 Q${inner} 9.78 ${inner} 9.0 Z`;
+	}
+
 	/**
 	 * Builds her SVG (viewBox 48x64, feet at the bottom centre, about six and a
 	 * half heads tall) and returns the movable parts. Limbs have joints: legs
@@ -86,7 +100,7 @@
 		const dr = DRESS[dressName] || DRESS.ankara;
 		const uid = Math.random().toString(36).slice(2, 9);
 		const url = (n) => `url(#ldb-${n}-${uid})`;
-		const ln = (a) => Object.assign({ stroke: LINE, "stroke-width": 0.32, "stroke-linejoin": "round", "stroke-linecap": "round" }, a);
+		const ln = (a) => Object.assign({ stroke: LINE, "stroke-width": 0.4, "stroke-linejoin": "round", "stroke-linecap": "round" }, a);
 		const strand = (d, parent, w, color, op) => node(doc, "path", { d, fill: "none", stroke: color || h.base, "stroke-width": w || 0.5, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: op == null ? 1 : op }, parent);
 		const sheen = (d, parent, w) => strand(d, parent, w || 0.35, h.sheen, 0.45);
 		const svg = node(doc, "svg", { viewBox: "0 0 48 64", width: "100%", height: "100%", overflow: "visible", "aria-hidden": "true" });
@@ -97,29 +111,33 @@
 			const g = node(doc, kind, Object.assign({ id: `ldb-${name}-${uid}` }, attrs), defs);
 			for (const [o, c, op] of stops) node(doc, "stop", { offset: o, "stop-color": c, "stop-opacity": op == null ? 1 : op }, g);
 		};
-		grad("linearGradient", "skin", { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, SKIN_LIGHT], [0.45, SKIN], [1, SKIN_SHADE]]);
-		grad("radialGradient", "face", { cx: 0.42, cy: 0.4, r: 0.68 }, [[0, SKIN_LIGHT], [0.55, SKIN], [1, SKIN_SHADE]]);
-		grad("linearGradient", "fold", { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, "#ffffff", 0.12], [0.4, "#000000", 0], [1, "#000000", 0.32]]);
+		// Cel shading: gradients with hard steps, like anime colouring.
+		grad("linearGradient", "skin", { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, SKIN_LIGHT], [0.2, SKIN_LIGHT], [0.2, SKIN], [0.68, SKIN], [0.68, SKIN_SHADE], [1, SKIN_SHADE]]);
+		grad("linearGradient", "fold", { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, "#ffffff", 0.14], [0.22, "#ffffff", 0.14], [0.22, "#000000", 0], [0.64, "#000000", 0], [0.64, "#000000", 0.28], [1, "#000000", 0.28]]);
 		grad("linearGradient", "drop", { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, "#000000", 0.3], [1, "#000000", 0]]);
-		grad("radialGradient", "hair", { cx: 0.38, cy: 0.3, r: 0.75 }, [[0, h.sheen, 0.5], [0.35, h.base], [1, h.shade]]);
-		grad("radialGradient", "iris", { cx: 0.5, cy: 0.62, r: 0.6 }, [[0, EYE_LIGHT], [0.7, EYE], [1, "#2a160b"]]);
+		const gloss = mix(h.base, h.sheen, 0.3);
+		grad("radialGradient", "hair", { cx: 0.36, cy: 0.28, r: 0.78 }, [[0, gloss], [0.1, gloss], [0.1, h.base], [0.66, h.base], [0.66, h.shade], [1, h.shade]]);
+		grad("radialGradient", "curls", { cx: 0.4, cy: 0.3, r: 0.8 }, [[0, h.base], [0.64, h.base], [0.64, h.shade], [1, h.shade]]);
+		grad("linearGradient", "iris", { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, "#1a0c05"], [0.42, EYE], [0.75, EYE_LIGHT], [1, "#e0a058"]]);
 		const pat = node(doc, "pattern", { id: `ldb-print-${uid}`, width: 4, height: 4, patternUnits: "userSpaceOnUse", patternTransform: "scale(0.68)" }, defs);
 		node(doc, "rect", { width: 4, height: 4, fill: dr.ground }, pat);
 		node(doc, "circle", { cx: 2, cy: 2, r: 1.2, fill: dr.motif, stroke: dr.ring, "stroke-width": 0.42 }, pat);
 		node(doc, "circle", { cx: 2, cy: 2, r: 0.38, fill: dr.ring }, pat);
 		for (const [x, y] of [[0, 0], [4, 0], [0, 4], [4, 4]]) node(doc, "circle", { cx: x, cy: y, r: 0.48, fill: dr.dot }, pat);
 		const print = url("print");
-		const almond = (x) => `M${x - 1.15} 9.1 Q${x - 0.2} 8.15 ${x + 1.15} 8.95 Q${x + 0.1} 9.85 ${x - 1.15} 9.1 Z`;
-		for (const [n, x] of [["eyeL", 22.2], ["eyeR", 25.8]]) node(doc, "path", { d: almond(x) }, node(doc, "clipPath", { id: `ldb-${n}-${uid}` }, defs));
+		for (const [n, x, o] of [["eyeL", 22, -1], ["eyeR", 26, 1]]) node(doc, "path", { d: eyeShape(x, o) }, node(doc, "clipPath", { id: `ldb-${n}-${uid}` }, defs));
 
 		const rig = node(doc, "g", {}, svg);
 		const p = { svg, rig };
 
 		// Loose curly hair: a big mass behind her shoulders (behind the body).
 		p.tails = node(doc, "g", {}, rig);
-		node(doc, "path", ln({ d: curly(24, 11, 9.6, 12.8, 34, 1.4), fill: url("hair") }), p.tails);
+		node(doc, "path", ln({ d: curly(24, 11, 9.6, 12.8, 34, 1.4), fill: url("curls") }), p.tails);
 		strand(curlTexture(24, 11, 9.6, 12.8, 46, 7, 0.75), p.tails, 0.32, h.shade, 0.7);
 		strand(curlTexture(24, 10, 9, 12, 30, 19, 0.6), p.tails, 0.28, h.sheen, 0.4);
+		// Cool rim light along the edge of her curls.
+		strand("M17.6 1.6 Q14 6 14.9 13 Q15.3 18.6 18 22.4", p.tails, 0.55, "#8aa2ff", 0.55);
+		strand("M30.4 1.6 Q34 6 33.1 13 Q32.7 18.6 30 22.4", p.tails, 0.4, "#8aa2ff", 0.3);
 
 		// Legs: thigh pivots at the hip, shin at the knee; bare feet in sandals.
 		const leg = (x) => {
@@ -161,82 +179,90 @@
 		if (dr.collar) node(doc, "rect", { x: 19.9, y: 29.9 - dr.sashH * 0.55, width: 8.2, height: 0.45, fill: "#f0cf78", opacity: 0.8 }, p.body);
 		else node(doc, "path", ln({ d: "M27.4 29.3 Q28.8 30.6 29.4 32.4 L28.4 32.2 Q28 30.8 27.2 30 Z", fill: dr.sash }), p.body);
 
-		// Head: curly crown, ears, an oval face with a jaw.
+		// Head: curly crown, ears, an oval face with a jaw (cel-shaded).
 		p.head = node(doc, "g", {}, rig);
 		node(doc, "path", ln({ d: curly(24, 6.6, 6.6, 5.6, 22, 1.1), fill: url("hair") }), p.head);
-		strand(curlTexture(24, 5.5, 6, 4, 14, 3, 0.6), p.head, 0.28, h.shade, 0.7);
-		for (const x of [19.55, 28.45]) node(doc, "ellipse", ln({ cx: x, cy: 9.3, rx: 0.6, ry: 1, fill: SKIN }), p.head);
+		strand(curlTexture(24, 5.5, 6, 4, 14, 3, 0.6), p.head, 0.26, h.shade, 0.6);
+		for (const x of [19.55, 28.45]) node(doc, "ellipse", ln({ cx: x, cy: 9.4, rx: 0.6, ry: 1, fill: SKIN }), p.head);
 		const faceD = "M19.75 7.9 Q19.8 3.7 24 3.6 Q28.2 3.7 28.25 7.9 Q28.3 11.3 26.4 13.1 Q25.1 14.3 24 14.3 Q22.9 14.3 21.6 13.1 Q19.7 11.3 19.75 7.9 Z";
-		node(doc, "path", ln({ d: faceD, fill: url("face") }), p.head);
-		node(doc, "ellipse", { cx: 21.3, cy: 10.4, rx: 0.9, ry: 0.45, fill: SKIN_LIGHT, opacity: 0.4 }, p.head);
-		node(doc, "ellipse", { cx: 26.7, cy: 10.4, rx: 0.9, ry: 0.45, fill: SKIN_LIGHT, opacity: 0.3 }, p.head);
-		node(doc, "ellipse", { cx: 21.5, cy: 11, rx: 0.85, ry: 0.45, fill: "#b8544c", opacity: 0.22 }, p.head);
-		node(doc, "ellipse", { cx: 26.5, cy: 11, rx: 0.85, ry: 0.45, fill: "#b8544c", opacity: 0.22 }, p.head);
-		// Nose: a soft shadow down the side, a highlight and the nostrils.
-		strand("M24.45 8.6 Q24.7 10.1 24.5 10.8", p.head, 0.3, SKIN_SHADE, 0.6);
-		node(doc, "ellipse", { cx: 23.95, cy: 10.2, rx: 0.22, ry: 0.5, fill: SKIN_LIGHT, opacity: 0.7 }, p.head);
-		strand("M23.35 11.05 Q23.6 11.35 23.85 11.15 M24.15 11.15 Q24.4 11.35 24.65 11.05", p.head, 0.25, LINE, 0.7);
+		node(doc, "path", ln({ d: faceD, fill: SKIN }), p.head);
+		// Hard-edged shadows: under the fringe, down the far side of the face and jaw.
+		node(doc, "path", { d: "M19.85 8.4 Q20.3 6.3 21.3 6.2 Q22.5 5.4 24 5.4 Q25.5 5.4 26.7 6.2 Q27.7 6.3 28.15 8.4 Q27.5 7.1 26.6 7.05 Q25.4 6.35 24 6.35 Q22.6 6.35 21.4 7.05 Q20.5 7.1 19.85 8.4 Z", fill: SKIN_SHADE, opacity: 0.75 }, p.head);
+		node(doc, "path", { d: "M28.2 8.2 Q28.3 11.3 26.4 13.1 Q25.1 14.3 24 14.3 Q25.7 13.3 26.7 11.5 Q27.6 9.9 28.2 8.2 Z", fill: SKIN_SHADE, opacity: 0.6 }, p.head);
+		// Glossy skin: cheek shine and soft blush strokes.
+		node(doc, "ellipse", { cx: 21.1, cy: 10.7, rx: 0.5, ry: 0.22, fill: "#ffffff", opacity: 0.22, transform: "rotate(-15 21.1 10.7)" }, p.head);
+		node(doc, "ellipse", { cx: 21.4, cy: 11.05, rx: 0.95, ry: 0.42, fill: "#c4544c", opacity: 0.22 }, p.head);
+		node(doc, "ellipse", { cx: 26.6, cy: 11.05, rx: 0.95, ry: 0.42, fill: "#c4544c", opacity: 0.2 }, p.head);
+		strand("M20.85 11.25 l0.35 -0.45 M21.35 11.3 l0.35 -0.45 M21.85 11.3 l0.35 -0.45 M26.15 11.3 l0.35 -0.45 M26.65 11.3 l0.35 -0.45 M27.15 11.25 l0.35 -0.45", p.head, 0.14, "#e0716a", 0.6);
+		// Anime nose: a small shadow stroke and a bright shine.
+		strand("M24.45 10.35 l0.28 0.6 l-0.38 0.12", p.head, 0.22, SKIN_SHADE, 0.9);
+		node(doc, "circle", { cx: 24.08, cy: 10.6, r: 0.15, fill: "#ffffff", opacity: 0.85 }, p.head);
 
-		// Eyes: almond-shaped, the iris clipped by the lids; lashes and creases.
+		// Big anime eyes: layered amber-brown iris, two catch-lights, winged lashes.
 		p.eyes = {};
 		p.eyes.open = node(doc, "g", {}, p.head);
 		p.pupils = [];
-		for (const [x, out, n] of [[22.2, -1, "eyeL"], [25.8, 1, "eyeR"]]) {
-			node(doc, "path", { d: almond(x), fill: "#f4ece6" }, p.eyes.open);
+		for (const [x, o, n] of [[22, -1, "eyeL"], [26, 1, "eyeR"]]) {
+			const inner = x - 1.2 * o, outer = x + 1.28 * o;
+			node(doc, "path", { d: eyeShape(x, o), fill: "#fbf6f2" }, p.eyes.open);
 			const clip = node(doc, "g", { "clip-path": url(n) }, p.eyes.open);
+			node(doc, "path", { d: `M${inner} 8.2 L${outer} 8.0 L${outer} 8.75 Q${x} 8.55 ${inner} 9.0 Z`, fill: "#8a7a96", opacity: 0.35 }, clip);
 			const iris = node(doc, "g", {}, clip);
-			node(doc, "circle", { cx: x, cy: 9.05, r: 0.62, fill: url("iris") }, iris);
-			node(doc, "circle", { cx: x, cy: 9.05, r: 0.27, fill: "#140a06" }, iris);
-			node(doc, "circle", { cx: x - 0.22, cy: 8.8, r: 0.15, fill: "#ffffff", opacity: 0.9 }, iris);
-			node(doc, "path", { d: `M${x - 1.15} 9.1 Q${x - 0.2} 8.15 ${x + 1.15} 8.95 L${x + 1.15} 8.7 Q${x - 0.2} 7.95 ${x - 1.15} 8.85 Z`, fill: "#000000", opacity: 0.25 }, clip);
+			node(doc, "ellipse", { cx: x + 0.05 * o, cy: 8.95, rx: 0.86, ry: 1.02, fill: url("iris"), stroke: "#1a0c05", "stroke-width": 0.14 }, iris);
+			node(doc, "ellipse", { cx: x + 0.05 * o, cy: 8.85, rx: 0.36, ry: 0.5, fill: "#0d0603" }, iris);
+			node(doc, "path", { d: `M${x - 0.6 + 0.05 * o} 9.35 Q${x + 0.05 * o} 9.95 ${x + 0.6 + 0.05 * o} 9.35 Q${x + 0.05 * o} 9.7 ${x - 0.6 + 0.05 * o} 9.35 Z`, fill: "#f2b86e", opacity: 0.7 }, iris);
+			node(doc, "ellipse", { cx: x - 0.3, cy: 8.48, rx: 0.33, ry: 0.27, fill: "#ffffff" }, iris);
+			node(doc, "circle", { cx: x + 0.36, cy: 9.42, r: 0.12, fill: "#ffffff", opacity: 0.9 }, iris);
 			p.pupils.push(iris);
-			const outer = out > 0 ? x + 1.15 : x - 1.15, inner = out > 0 ? x - 1.15 : x + 1.15;
-			strand(`M${inner} ${out > 0 ? 9.1 : 8.95} Q${x - 0.2 * out} 8.05 ${outer} ${out > 0 ? 8.95 : 9.1} l${0.42 * out} -0.32`, p.eyes.open, 0.42, LINE);
-			strand(`M${x - 1} 8.15 Q${x - 0.1} 7.55 ${x + 1} 8.05`, p.eyes.open, 0.18, SKIN_SHADE, 0.8);
-			strand(`M${x - 0.7} 9.75 Q${x + 0.1} 9.95 ${x + 0.9} 9.6`, p.eyes.open, 0.15, LINE, 0.5);
+			strand(`M${inner - 0.05 * o} 9.0 Q${x - 0.5 * o} 7.72 ${x + 0.6 * o} 7.78 Q${outer + 0.1 * o} 7.88 ${outer + 0.3 * o} 8.65`, p.eyes.open, 0.5, LINE);
+			strand(`M${outer} 8.2 l${0.6 * o} -0.32 M${outer + 0.15 * o} 8.5 l${0.55 * o} 0.02`, p.eyes.open, 0.28, LINE);
+			strand(`M${x - 0.25 * o} 9.97 Q${x + 0.65 * o} 9.97 ${outer - 0.05 * o} 8.95`, p.eyes.open, 0.18, LINE, 0.8);
+			strand(`M${x - 0.7 * o} 7.35 Q${x + 0.35 * o} 7.05 ${x + 1.15 * o} 7.42`, p.eyes.open, 0.17, SKIN_SHADE);
 		}
-		const eyeLines = (d) => node(doc, "path", { d, stroke: LINE, "stroke-width": 0.38, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round", display: "none" }, p.head);
-		p.eyes.closed = eyeLines("M21.05 9.05 Q22.2 9.75 23.35 9.0 M24.65 9.0 Q25.8 9.75 26.95 9.05 M21.2 9.25 l-0.3 0.35 M26.8 9.25 l0.3 0.35");
-		p.eyes.happy = eyeLines("M21.05 9.4 Q22.2 8.45 23.35 9.4 M24.65 9.4 Q25.8 8.45 26.95 9.4");
-		p.eyes.x = eyeLines("M21.6 8.45 L22.8 9.65 M22.8 8.45 L21.6 9.65 M25.2 8.45 L26.4 9.65 M26.4 8.45 L25.2 9.65");
+		const eyeLines = (d) => node(doc, "path", { d, stroke: LINE, "stroke-width": 0.42, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round", display: "none" }, p.head);
+		p.eyes.closed = eyeLines("M20.75 8.85 Q22 9.75 23.2 8.9 M24.8 8.9 Q26 9.75 27.25 8.85 M20.85 8.95 l-0.45 0.25 M27.15 8.95 l0.45 0.25");
+		p.eyes.happy = eyeLines("M20.8 9.35 Q22 8.1 23.2 9.35 M24.8 9.35 Q26 8.1 27.2 9.35");
+		p.eyes.x = eyeLines("M21.4 8.35 L22.6 9.55 M22.6 8.35 L21.4 9.55 M25.4 8.35 L26.6 9.55 M26.6 8.35 L25.4 9.55");
 		p.eyes.wide = node(doc, "g", { display: "none" }, p.head);
-		for (const x of [22.2, 25.8]) {
-			node(doc, "ellipse", { cx: x, cy: 9, rx: 1.1, ry: 0.85, fill: "#f4ece6", stroke: LINE, "stroke-width": 0.35 }, p.eyes.wide);
-			node(doc, "circle", { cx: x, cy: 9.05, r: 0.42, fill: url("iris") }, p.eyes.wide);
-			node(doc, "circle", { cx: x, cy: 9.05, r: 0.18, fill: "#140a06" }, p.eyes.wide);
+		for (const x of [22, 26]) {
+			node(doc, "ellipse", { cx: x, cy: 8.9, rx: 1.15, ry: 1.05, fill: "#fbf6f2", stroke: LINE, "stroke-width": 0.4 }, p.eyes.wide);
+			node(doc, "circle", { cx: x, cy: 8.95, r: 0.45, fill: url("iris") }, p.eyes.wide);
+			node(doc, "circle", { cx: x - 0.15, cy: 8.8, r: 0.12, fill: "#ffffff" }, p.eyes.wide);
 		}
-		// Brows: full, tapered.
-		node(doc, "path", { d: "M20.8 7.55 Q21.8 6.55 23.35 6.9 L23.3 7.25 Q21.9 7.0 20.95 7.75 Z", fill: LINE }, p.head);
-		node(doc, "path", { d: "M27.2 7.55 Q26.2 6.55 24.65 6.9 L24.7 7.25 Q26.1 7.0 27.05 7.75 Z", fill: LINE }, p.head);
+		// Slim, tapered anime brows.
+		node(doc, "path", { d: "M20.6 6.95 Q21.85 6.0 23.3 6.4 L23.25 6.65 Q21.95 6.35 20.75 7.1 Z", fill: LINE }, p.head);
+		node(doc, "path", { d: "M27.4 6.95 Q26.15 6.0 24.7 6.4 L24.75 6.65 Q26.05 6.35 27.25 7.1 Z", fill: LINE }, p.head);
 
-		// Lips: cupid's bow on top, a fuller lower lip with a little gloss.
+		// Lips: a fine upper line, a full lower lip with a glossy highlight.
 		p.mouth = {};
 		p.mouth.smile = node(doc, "g", {}, p.head);
-		node(doc, "path", { d: "M22.85 12.15 Q23.4 11.65 23.85 11.85 L24 11.95 L24.15 11.85 Q24.6 11.65 25.15 12.15 Q24 12.3 22.85 12.15 Z", fill: LIP_TOP }, p.mouth.smile);
-		node(doc, "path", { d: "M22.85 12.15 Q24 12.3 25.15 12.15 Q24.7 13.05 24 13.05 Q23.3 13.05 22.85 12.15 Z", fill: LIP_LOW }, p.mouth.smile);
-		strand("M22.9 12.17 Q24 12.35 25.1 12.17", p.mouth.smile, 0.2, LINE, 0.8);
-		node(doc, "ellipse", { cx: 24.3, cy: 12.62, rx: 0.32, ry: 0.13, fill: "#ffffff", opacity: 0.35 }, p.mouth.smile);
+		node(doc, "path", { d: "M23.15 12.2 Q23.6 11.95 24 12.1 Q24.4 11.95 24.85 12.2 Q24 12.35 23.15 12.2 Z", fill: LIP_TOP }, p.mouth.smile);
+		node(doc, "path", { d: "M23.25 12.3 Q24 12.42 24.75 12.3 Q24.55 13.0 24 13.02 Q23.45 13.0 23.25 12.3 Z", fill: LIP_LOW }, p.mouth.smile);
+		strand("M23.1 12.25 Q24 12.42 24.9 12.25", p.mouth.smile, 0.22, LINE);
+		node(doc, "ellipse", { cx: 24.25, cy: 12.62, rx: 0.3, ry: 0.11, fill: "#ffffff", opacity: 0.6 }, p.mouth.smile);
+		strand("M23.7 13.35 Q24 13.45 24.3 13.35", p.mouth.smile, 0.16, SKIN_SHADE);
 		p.mouth.open = node(doc, "g", { display: "none" }, p.head);
-		node(doc, "path", { d: "M23.1 12.1 Q24 11.6 24.9 12.1 Q24.8 13.3 24 13.35 Q23.2 13.3 23.1 12.1 Z", fill: "#3e1a1c", stroke: LIP_LOW, "stroke-width": 0.35 }, p.mouth.open);
-		p.mouth.wavy = node(doc, "path", { d: "M23 12.3 q0.5 -0.45 1 0 q0.5 0.45 1 0", stroke: LIP_TOP, "stroke-width": 0.42, fill: "none", "stroke-linecap": "round", display: "none" }, p.head);
-		p.mouth.cat = node(doc, "g", { display: "none" }, p.head);
-		node(doc, "path", { d: "M23.1 12.15 Q24 12.05 24.9 12.15 Q24.5 12.75 24 12.75 Q23.5 12.75 23.1 12.15 Z", fill: LIP_LOW }, p.mouth.cat);
-		strand("M23.1 12.15 Q24 12.0 24.9 12.15", p.mouth.cat, 0.22, LIP_TOP);
+		node(doc, "path", { d: "M23.15 12.1 Q24 11.7 24.85 12.1 Q24.75 13.3 24 13.35 Q23.25 13.3 23.15 12.1 Z", fill: "#3e1a1c", stroke: LINE, "stroke-width": 0.25 }, p.mouth.open);
+		node(doc, "path", { d: "M23.45 12.9 Q24 12.6 24.55 12.9 Q24 13.25 23.45 12.9 Z", fill: "#c4545a" }, p.mouth.open);
+		p.mouth.wavy = node(doc, "path", { d: "M23 12.3 q0.5 -0.45 1 0 q0.5 0.45 1 0", stroke: LINE, "stroke-width": 0.32, fill: "none", "stroke-linecap": "round", display: "none" }, p.head);
+		p.mouth.cat = node(doc, "path", { d: "M23.2 12.1 Q23.6 12.6 24 12.15 Q24.4 12.6 24.8 12.1", stroke: LINE, "stroke-width": 0.28, fill: "none", "stroke-linecap": "round", display: "none" }, p.head);
 
-		// A soft curly fringe over the forehead, a few curls falling at the temples.
+		// A soft curly fringe; a glossy highlight band ("angel ring") across it.
 		node(doc, "path", ln({ d: "M19.7 8.4 Q19.3 3.2 24 2.9 Q28.7 3.2 28.3 8.4 Q27.9 6.6 27 6.1 Q26.6 5.2 25.6 5.5 Q24.9 4.6 24 5.1 Q23.1 4.6 22.4 5.5 Q21.4 5.2 21 6.1 Q20.1 6.6 19.7 8.4 Z", fill: url("hair") }), p.head);
-		strand("M21.1 5.9 a0.6 0.6 0 1 1 1 0.4 M24.1 5.1 a0.6 0.6 0 1 1 1 0.4 M26.1 5.6 a0.55 0.55 0 1 0 -0.9 0.4", p.head, 0.25, h.sheen, 0.45);
-		strand("M19.9 7.4 q-0.9 0.9 -0.2 1.8 q0.8 0.8 -0.2 1.7", p.head, 0.42);
-		strand("M28.1 7.4 q0.9 0.9 0.2 1.8 q-0.8 0.8 0.2 1.7", p.head, 0.42);
+		node(doc, "path", { d: "M20.9 4.4 Q24 2.6 27.1 4.4", fill: "none", stroke: h.sheen, "stroke-width": 0.32, "stroke-dasharray": "0.9 0.5 0.5 0.5", "stroke-linecap": "round", opacity: 0.5 }, p.head);
+		strand("M21.1 5.9 a0.6 0.6 0 1 1 1 0.4 M26.1 5.6 a0.55 0.55 0 1 0 -0.9 0.4", p.head, 0.2, h.sheen, 0.3);
+		strand("M19.9 7.4 q-0.9 0.9 -0.2 1.8 q0.8 0.8 -0.2 1.7 l-0.25 0.5", p.head, 0.42);
+		strand("M28.1 7.4 q0.9 0.9 0.2 1.8 q-0.8 0.8 0.2 1.7 l0.25 0.5", p.head, 0.42);
 
 		// Loose ringlets falling over her shoulders; they swing as she moves.
 		p.locks = node(doc, "g", {}, rig);
 		const lock = (x, dir, seed) => {
 			const g = node(doc, "g", {}, p.locks);
-			node(doc, "path", ln({ d: curly(x + dir * 0.6, 15.6, 2.3, 8.2, 16, 0.9), fill: url("hair") }), g);
+			node(doc, "path", ln({ d: curly(x + dir * 0.6, 15.6, 2.3, 8.2, 16, 0.9), fill: url("curls") }), g);
 			strand(curlTexture(x + dir * 0.6, 15.6, 2, 7.6, 12, seed, 0.55), g, 0.28, h.shade, 0.75);
 			strand(`M${x + dir * 1.4} 19 q${dir * 1.4} 0.8 ${dir * 0.4} 2 q${-dir * 1.2} 1 ${dir * 0.2} 2.2 q${dir * 1} 0.6 ${dir * 0.1} 1.6`, g, 0.55, h.base);
-			strand(`M${x + dir * 0.2} 13 q${-dir * 0.9} 0.7 0 1.6`, g, 0.3, h.sheen, 0.45);
+			strand(`M${x + dir * 0.2} 13 q${-dir * 0.9} 0.7 0 1.6`, g, 0.3, h.sheen, 0.55);
+			strand(`M${x + dir * 2.6} 9.5 Q${x + dir * 3.2} 15 ${x + dir * 2.4} 21.5`, g, 0.4, "#8aa2ff", 0.45);
 			return g;
 		};
 		p.tailL = lock(18.9, -1, 11);
@@ -284,7 +310,7 @@
 			const [px, py] = PIVOT[part];
 			p[part].setAttribute("transform", `rotate(${(q[JOINTS[part]] || 0).toFixed(1)} ${px} ${py})`);
 		}
-		const tilt = `rotate(${(q.headTilt || 0).toFixed(1)} 24 14)`;
+		const tilt = `rotate(${(q.headTilt || 0).toFixed(1)} 24 14) translate(24 14) scale(1.1) translate(-24 -14)`;
 		p.head.setAttribute("transform", tilt);
 		p.tails.setAttribute("transform", tilt);
 		p.locks.setAttribute("transform", tilt);
