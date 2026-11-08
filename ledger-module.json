@@ -1,0 +1,38 @@
+{
+  "id": "desk-buddy",
+  "name": "Desk Buddy",
+  "version": "0.1.0",
+  "description": "A little anime girl who climbs your Ledger windows while you work.",
+  "ledger": ">=0.9.1",
+  "server": "server.mjs",
+  "ui": "ui",
+  "nav": {
+    "label": "Desk Buddy",
+    "icon": {
+      "path": "M12 4.5a6.5 6.5 0 1 0 0.01 0 M6.2 8.5C3.5 11 3.5 16 5 19.5 M17.8 8.5C20.5 11 20.5 16 19 19.5 M7 9.5q5 -4 10 0 M9.8 12.2v1.6 M14.2 12.2v1.6 M10.8 15.6q1.2 0.9 2.4 0"
+    }
+  },
+  "settings": {
+    "fields": [
+      { "key": "buddy_name", "label": "Her name", "type": "text", "default": "Hana", "help": "What she calls herself in speech bubbles." },
+      { "key": "auto_summon", "label": "Come out when the Desk Buddy page opens", "type": "boolean", "default": true, "help": "Off: she waits until you press Summon." },
+      { "key": "hair", "label": "Hair colour", "type": "select", "default": "pink", "options": [
+        { "value": "pink", "label": "Sakura pink" },
+        { "value": "midnight", "label": "Midnight blue" },
+        { "value": "silver", "label": "Silver" },
+        { "value": "chestnut", "label": "Chestnut" },
+        { "value": "mint", "label": "Mint" },
+        { "value": "honey", "label": "Honey blonde" }
+      ] },
+      { "key": "size", "label": "Height (pixels)", "type": "number", "min": 48, "max": 160, "default": 84 },
+      { "key": "energy", "label": "Energy", "type": "select", "default": "normal", "options": [
+        { "value": "calm", "label": "Calm: mostly sits and watches" },
+        { "value": "normal", "label": "Normal" },
+        { "value": "hyper", "label": "Hyper: climbs everything" }
+      ] },
+      { "key": "speech", "label": "Speech bubbles", "type": "boolean", "default": true },
+      { "key": "sleep_after", "label": "Falls asleep after (seconds without input)", "type": "number", "min": 15, "max": 3600, "default": 120 },
+      { "key": "extra_windows", "label": "Extra things she can climb (CSS selectors)", "type": "text", "default": "", "help": "Comma-separated, e.g. table, .toolbar. Panes, cards and dialogs are always climbable." }
+    ]
+  }
+}

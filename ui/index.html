@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desk Buddy</title>
+<style>
+	:root { --bg: #fff; --surface: #fff; --soft: #f6f8fa; --text: #1d232b; --muted: #5d6875; --border: #dde1e6; --accent: #1f6feb; --danger: #cf222e; color-scheme: light; }
+	@media (prefers-color-scheme: dark) {
+		:root { --bg: #171b21; --surface: #171b21; --soft: #1e242c; --text: #e3e7ec; --muted: #97a1ad; --border: #2c333c; --accent: #4c8dff; --danger: #ff7b72; color-scheme: dark; }
+	}
+	* { box-sizing: border-box; }
+	body { margin: 0; padding: 1rem 1.25rem 2rem; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+	h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
+	h2 { font-size: 1rem; margin: 0 0 0.5rem; }
+	p { margin: 0.4rem 0; }
+	.muted { color: var(--muted); }
+	.error { color: var(--danger); }
+	.card { border: 1px solid var(--border); border-radius: 6px; padding: 0.9rem 1rem; margin: 0.9rem 0; background: var(--surface); }
+	.hero { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+	.stage { width: 96px; height: 120px; flex: none; display: flex; align-items: flex-end; justify-content: center; background: var(--soft); border-radius: 6px; border: 1px solid var(--border); }
+	.stage > div { width: 72px; height: 96px; }
+	.hero-text { flex: 1; min-width: 12rem; }
+	.buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+	button { padding: 0.4rem 0.8rem; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+	button.plain { background: transparent; color: var(--text); border-color: var(--border); }
+	button:disabled { opacity: 0.55; cursor: default; }
+	ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+	li { margin: 0.2rem 0; }
+	a { color: var(--accent); }
+	#status { font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Desk Buddy</h1>
+<p class="muted">A little friend who keeps you company while you do the books.</p>
+
+<div class="card hero">
+	<div class="stage"><div id="preview"></div></div>
+	<div class="hero-text">
+		<p id="status">Loading…</p>
+		<div class="buttons">
+			<button id="summon" type="button">Summon her</button>
+			<button id="dismiss" type="button" class="plain">Send her home</button>
+		</div>
+		<p id="error" class="error"></p>
+	</div>
+</div>
+
+<div class="card">
+	<h2>What she does</h2>
+	<ul>
+		<li>Wanders along the bottom of the screen, peeks at things and follows your cursor with her eyes.</li>
+		<li>Climbs the sides of windows (side-by-side panes, cards and dialogs) and sits on top of them, legs dangling.</li>
+		<li>Close a pane or dialog she's on, or scroll her card away, and she falls to whatever is below — usually the bottom of the screen.</li>
+		<li>Open a new pane and she'll often run over to climb it.</li>
+		<li>Watches while you type, waves when your cursor hangs around, and falls asleep when you stop working.</li>
+		<li>Drag her anywhere and let go to throw her. Click to poke, double-click for a heart.</li>
+	</ul>
+</div>
+
+<div class="card">
+	<h2>Keeping her around</h2>
+	<p>She lives in this Ledger browser tab until it's reloaded. To have her come back by herself, open
+		<strong>Desk Buddy beside</strong> (the button next to it in the sidebar) and make that pane narrow:
+		Ledger restores panes on reload, and she comes back out.</p>
+	<p class="muted">Her name, look, size, energy and bedtime are under Settings → Desk Buddy.</p>
+</div>
+
+<script src="buddy.js"></script>
+<script>
+	"use strict";
+	const kit = window.__deskBuddyKit;
+	const $ = (id) => document.getElementById(id);
+	const showError = (e) => ($("error").textContent = e ? e.message || String(e) : "");
+	let cfg = kit.normalize({});
+
+	// The Ledger window around this page (same origin), or this page itself when opened directly.
+	function host() {
+		try {
+			const t = window.top;
+			if (t !== window && t.location.origin === location.origin && t.document.body) return t;
+		} catch {
+			/* not same-origin: play on this page */
+		}
+		return window;
+	}
+
+	function buddy() {
+		const h = host();
+		return h.__deskBuddy && h.__deskBuddy.alive ? h.__deskBuddy : null;
+	}
+
+	function refresh() {
+		const b = buddy();
+		$("status").textContent = b ? `${cfg.name} is out and about in this tab.` : `${cfg.name} is resting.`;
+		$("summon").textContent = b ? `Say hi to ${cfg.name}` : `Summon ${cfg.name}`;
+		$("dismiss").disabled = !b;
+	}
+
+	function loadKitInto(h) {
+		if (h === window || (h.__deskBuddyKit && h.__deskBuddyKit.version === kit.version)) return Promise.resolve(h.__deskBuddyKit || kit);
+		return new Promise((resolve, reject) => {
+			const s = h.document.createElement("script");
+			s.charset = "utf-8";
+			s.src = new URL("buddy.js?v=" + encodeURIComponent(kit.version), location.href).href;
+			s.onload = () => resolve(h.__deskBuddyKit);
+			s.onerror = () => reject(new Error("Couldn't load her script."));
+			h.document.head.appendChild(s);
+		});
+	}
+
+	async function summon() {
+		showError(null);
+		const h = host();
+		const existing = buddy();
+		if (existing) {
+			existing.configure(JSON.parse(JSON.stringify(cfg)));
+			existing.say(`Hi! I'm ${cfg.name}!`);
+		} else {
+			const k = await loadKitInto(h);
+			// A plain copy, so nothing ties her to this page once it closes.
+			k.start(JSON.parse(JSON.stringify(cfg)));
+		}
+		refresh();
+	}
+
+	function dismiss() {
+		const b = buddy();
+		if (!b) return;
+		b.say("Bye bye!");
+		setTimeout(() => {
+			b.stop();
+			refresh();
+		}, 700);
+	}
+
+	// Preview: a tiny copy of her, waving now and then.
+	let preview = null;
+	function drawPreview() {
+		const box = $("preview");
+		preview = kit.createSvg(document, cfg.hair);
+		box.replaceChildren(preview.svg);
+	}
+	function animatePreview(ts) {
+		const t = ts / 1000;
+		const waving = t % 6 < 2;
+		const blink = t % 3.7 < 0.13;
+		kit.applyPose(preview, {
+			armL: 6,
+			armR: waving ? -135 + Math.sin(t * 12) * 18 : -6,
+			tailL: 4 + Math.sin(t * 1.7) * 4,
+			tailR: -4 + Math.sin(t * 1.7) * 4,
+			bob: Math.sin(t * 2.4) * 0.35,
+			headTilt: waving ? -6 : Math.sin(t * 0.9) * 4,
+			eyes: blink ? "closed" : waving ? "happy" : "open",
+			mouth: waving ? "open" : "smile",
+			lookX: Math.sin(t * 0.7) * 0.8,
+		});
+		requestAnimationFrame(animatePreview);
+	}
+
+	$("summon").onclick = () => summon().catch(showError);
+	$("dismiss").onclick = dismiss;
+
+	(async () => {
+		try {
+			const r = await fetch("/api/v1/m/desk-buddy/config", { headers: { "Content-Type": "application/json" } });
+			if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error?.message || r.statusText);
+			const c = await r.json();
+			cfg = kit.normalize(c);
+			cfg.autoSummon = c.autoSummon !== false;
+		} catch (e) {
+			showError(new Error(`Couldn't load her settings (${e.message}); using defaults.`));
+			cfg.autoSummon = true;
+		}
+		drawPreview();
+		requestAnimationFrame(animatePreview);
+		if (cfg.autoSummon) await summon().catch(showError);
+		refresh();
+		setInterval(refresh, 2000);
+	})();
+</script>
+</body>
+</html>
