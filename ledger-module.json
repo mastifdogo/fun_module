@@ -1,7 +1,7 @@
 {
   "id": "desk-buddy",
   "name": "Desk Buddy",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A little anime girl who climbs your Ledger windows while you work.",
   "ledger": ">=0.9.1",
   "server": "server.mjs",
@@ -124,6 +124,38 @@
         "type": "text",
         "default": "",
         "help": "Comma-separated, e.g. table, .toolbar. Panes, cards and dialogs are always climbable."
+      },
+      {
+        "key": "renderer",
+        "label": "Look",
+        "type": "select",
+        "default": "auto",
+        "options": [
+          {
+            "value": "auto",
+            "label": "3D when a model is installed, otherwise drawn"
+          },
+          {
+            "value": "2d",
+            "label": "Always the drawn version"
+          }
+        ]
+      },
+      {
+        "key": "model_file",
+        "label": "3D model file",
+        "type": "text",
+        "default": "model/buddy.glb",
+        "help": "A rigged .glb inside the module's ui/ folder. See the README for how to add one."
+      },
+      {
+        "key": "model_yaw",
+        "label": "3D model turn (degrees)",
+        "type": "number",
+        "min": -180,
+        "max": 180,
+        "default": 0,
+        "help": "If the model doesn't face you when standing still, turn it by this much."
       }
     ]
   }

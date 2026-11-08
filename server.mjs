@@ -5,6 +5,7 @@
 const HAIR = ["black", "chestnut", "midnight", "pink", "silver", "honey"];
 const ENERGY = ["calm", "normal", "hyper"];
 const DRESS = ["ankara", "yukata"];
+const MODEL_PATH = /^[A-Za-z0-9_-][A-Za-z0-9_./-]{0,199}\.(glb|gltf)$/;
 
 /** @param {unknown} v @param {number} min @param {number} max @param {number} dflt */
 function num(v, min, max, dflt) {
@@ -26,6 +27,9 @@ export function cleanConfig(s) {
 		speech: s.speech !== false,
 		sleepAfter: num(s.sleep_after, 15, 3600, 120),
 		extraWindows: extra,
+		renderer: s.renderer === "2d" ? "2d" : "auto",
+		modelFile: typeof s.model_file === "string" && MODEL_PATH.test(s.model_file.trim()) && !s.model_file.includes("..") ? s.model_file.trim() : "model/buddy.glb",
+		modelYaw: num(s.model_yaw, -180, 180, 0),
 	};
 }
 

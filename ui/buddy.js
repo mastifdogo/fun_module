@@ -14,11 +14,13 @@
  */
 (function () {
 	"use strict";
-	const VERSION = "0.3.0";
+	const VERSION = "0.4.0";
 	const NS = "http://www.w3.org/2000/svg";
 	const kit = (window.__deskBuddyKit = window.__deskBuddyKit || {});
 	if (kit.version === VERSION && kit.start) return;
 	kit.version = VERSION;
+	// Where this file was loaded from: buddy3d.js and the 3D model sit next to it.
+	kit.base = (document.currentScript && document.currentScript.src) || kit.base || location.href;
 
 	// ---------------------------------------------------------------- art --
 
@@ -400,6 +402,34 @@
 			if (!root.isConnected) doc.body.appendChild(root);
 		}
 		mount();
+
+		// ---- 3D: a rigged model (ui/model/buddy.glb) replaces the drawing when installed.
+		let three = null, threeLoading = false;
+		async function try3d() {
+			if (cfg.renderer === "2d" || three || threeLoading) return;
+			threeLoading = true;
+			try {
+				const url = new URL(cfg.modelFile, kit.base).href;
+				const head = await fetch(url, { method: "HEAD", credentials: "same-origin" });
+				if (!head.ok) return;
+				const mod = await import(new URL("buddy3d.js?v=" + VERSION, kit.base).href);
+				const r = await mod.create3d({ doc, modelUrl: url, yawOffset: cfg.modelYaw });
+				if (!alive || cfg.renderer === "2d") return r.dispose();
+				three = r;
+				sprite.replaceChildren(r.canvas);
+				console.info("desk-buddy: 3D model loaded", r.info);
+			} catch (err) {
+				console.warn("desk-buddy: staying 2D, the 3D model didn't load:", err);
+			} finally {
+				threeLoading = false;
+			}
+		}
+		function drop3d() {
+			if (!three) return;
+			three.dispose();
+			three = null;
+			build();
+		}
 
 		// ---- sizes (all in screen pixels)
 		let S, H, SW, HALF, REACH, JUMPX, WALK, CLIMB;
@@ -1385,10 +1415,15 @@
 
 		function draw(dt) {
 			const q = smooth(pose(), dt);
-			applyPose(parts, q);
 			const left = st.x - SW / 2;
 			const top = st.y - H;
-			sprite.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0) scaleX(${st.face})`;
+			if (three) {
+				three.render(q, { face: st.face, mode: st.mode, dt, H, SW, grounded: grounded() });
+				sprite.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
+			} else {
+				applyPose(parts, q);
+				sprite.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0) scaleX(${st.face})`;
+			}
 			const lowered = ((q.bob || 0) / 64) * H; // sitting or peeking lowers her head
 			const headTop = top + lowered;
 			if (bubble.classList.contains("show")) {
@@ -1446,13 +1481,14 @@
 		}
 		scan();
 		raf = W.requestAnimationFrame(frame);
+		try3d();
 		setTimeout(() => say(pick(LINES.hello), 3), 900);
 
 		const api = {
 			alive: true,
 			version: VERSION,
 			get state() {
-				return { mode: st.mode, x: Math.round(st.x), y: Math.round(st.y), face: st.face, onFloor: st.ground === FLOOR, climbing: !!st.wall, windows: boxes.length };
+				return { mode: st.mode, x: Math.round(st.x), y: Math.round(st.y), face: st.face, onFloor: st.ground === FLOOR, climbing: !!st.wall, windows: boxes.length, renderer: three ? "3d" : "2d", model: three ? three.info : null };
 			},
 			configure(c) {
 				const before = cfg;
@@ -1460,8 +1496,11 @@
 				SEL = selectors();
 				known = new WeakSet();
 				firstScan = true;
-				if (before.hair !== cfg.hair || before.dress !== cfg.dress) build();
+				const modelChanged = before.renderer !== cfg.renderer || before.modelFile !== cfg.modelFile || before.modelYaw !== cfg.modelYaw;
+				if (modelChanged) drop3d();
+				else if (!three && (before.hair !== cfg.hair || before.dress !== cfg.dress)) build();
 				sizes();
+				if (modelChanged) try3d();
 			},
 			say(text) {
 				say(text, 3, 2);
@@ -1495,6 +1534,7 @@
 				alive = false;
 				api.alive = false;
 				W.cancelAnimationFrame(raf);
+				if (three) three.dispose();
 				for (const [t, type, fn, opts] of listeners) {
 					try {
 						t.removeEventListener(type, fn, opts);
@@ -1511,6 +1551,9 @@
 		return api;
 	}
 
+	// A model file inside the module's ui/ folder, e.g. model/buddy.glb.
+	const MODEL_PATH = /^[A-Za-z0-9_-][A-Za-z0-9_./-]{0,199}\.(glb|gltf)$/;
+
 	function normalize(c) {
 		c = c && typeof c === "object" ? c : {};
 		const size = Number(c.size);
@@ -1523,6 +1566,9 @@
 			speech: c.speech !== false,
 			sleepAfter: Number.isFinite(Number(c.sleepAfter)) ? clamp(Number(c.sleepAfter), 15, 3600) : 120,
 			extraWindows: typeof c.extraWindows === "string" ? c.extraWindows.slice(0, 500) : "",
+			renderer: c.renderer === "2d" ? "2d" : "auto",
+			modelFile: typeof c.modelFile === "string" && MODEL_PATH.test(c.modelFile) && !c.modelFile.includes("..") ? c.modelFile : "model/buddy.glb",
+			modelYaw: Number.isFinite(Number(c.modelYaw)) ? clamp(Number(c.modelYaw), -180, 180) : 0,
 		};
 	}
 

@@ -35,6 +35,42 @@ runs entirely in your browser; nothing is stored.
 
 "Send her home" on the Desk Buddy page puts her away.
 
+## Making her 3D (lifelike)
+
+Desk Buddy has a full 3D renderer (three.js, bundled in `ui/vendor/`, MIT
+licence). Add a rigged human model and she becomes a lit, shaded 3D character
+who does everything the drawn version does: walks, climbs, hangs, sits on
+window edges, falls, gets dragged. Without a model she stays drawn.
+
+1. Get a **rigged humanoid** model as **glTF binary (`.glb`)**. Good sources:
+   - **MakeHuman** (free; exported models are public domain/CC0): build her,
+     add hair, skin and clothes, use the *Game engine* or *Default* skeleton,
+     export glTF/GLB.
+   - **Mixamo** (free with an Adobe account): rigged characters and
+     animations. Download animations *In Place*.
+   - **Character Creator / Daz / VRoid** exports also work.
+2. Save it in this repository as **`ui/model/buddy.glb`** (or set
+   *3D model file* in Settings), commit, and release.
+3. If she doesn't face you when standing, set *3D model turn* (e.g. 180).
+
+What's detected automatically:
+
+- **Skeleton**: Mixamo, MakeHuman, VRoid/VRM, Character Creator and Rigify
+  bone names (arms, forearms, thighs, shins, head). Her poses are applied to
+  these bones.
+- **Animation clips** in the file are used when their names match what she's
+  doing: `idle`, `walk`, `climb`, `hang`, `jump`, `fall`, `land`, `sit`,
+  `sleep`, `wave`, `hurt`, `point`, `laugh`... (e.g. Mixamo "Walking",
+  "Sitting Idle", "Falling Idle", "Waving"). Real motion-capture clips make
+  her look far more lifelike than the built-in poses.
+- **Face morphs** for blinking, smiling and an open mouth (names like
+  `eyeBlink`, `mouthSmile`, `jawOpen`, VRoid `Fcl_EYE_Close`).
+
+Tips: keep the file under ~10 MB (she's small on screen; 1K textures are
+plenty), don't use Draco or Meshopt compression, and remember that if this
+repository is public, the model file is public too: only commit a model whose
+licence allows redistribution.
+
 ## Settings (Settings → Desk Buddy)
 
 | Setting | Default | |
@@ -48,6 +84,9 @@ runs entirely in your browser; nothing is stored.
 | Speech bubbles | on | |
 | Falls asleep after | 120 s | Seconds without mouse or keyboard input. |
 | Extra things she can climb | — | CSS selectors, comma-separated (e.g. `table, .toolbar`). |
+| Look | 3D when a model is installed | Or always the drawn version. |
+| 3D model file | model/buddy.glb | Path inside `ui/`. |
+| 3D model turn | 0° | Turns a model that doesn't face you. |
 
 ## How it works
 
@@ -77,6 +116,9 @@ tag and create a GitHub Release from it.
 
 ## Changes
 
+- 0.4.0: 3D renderer: add a rigged `.glb` model (`ui/model/buddy.glb`) and
+  she's shown as a lit 3D character, posed by her behaviours or by the
+  model's own animation clips. New Look / 3D model settings.
 - 0.3.0: high-definition anime style: cel shading, larger detailed anime eyes
   with layered irises and catch-lights, glossy skin and lips, a highlight band
   and rim light on her curls, crisper line art, slightly larger head.

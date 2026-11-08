@@ -64,7 +64,8 @@
 	<p>She lives in this Ledger browser tab until it's reloaded. To have her come back by herself, open
 		<strong>Desk Buddy beside</strong> (the button next to it in the sidebar) and make that pane narrow:
 		Ledger restores panes on reload, and she comes back out.</p>
-	<p class="muted">Her name, look, size, energy and bedtime are under Settings → Desk Buddy.</p>
+	<p class="muted">Her name, look, size, energy and bedtime are under Settings → Desk Buddy.
+		To make her 3D, add a rigged <code>.glb</code> model as <code>ui/model/buddy.glb</code> in the module's repository (see its README).</p>
 </div>
 
 <script src="buddy.js"></script>
@@ -93,7 +94,8 @@
 
 	function refresh() {
 		const b = buddy();
-		$("status").textContent = b ? `${cfg.name} is out and about in this tab.` : `${cfg.name} is resting.`;
+		const look = b && b.state.renderer === "3d" ? " (in 3D)" : "";
+		$("status").textContent = b ? `${cfg.name} is out and about in this tab${look}.` : `${cfg.name} is resting.`;
 		$("summon").textContent = b ? `Say hi to ${cfg.name}` : `Summon ${cfg.name}`;
 		$("dismiss").disabled = !b;
 	}
